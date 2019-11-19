@@ -14,8 +14,10 @@ from scipy.optimize import curve_fit
 
 
 def transport_count_lines(transport_file,N_segments = 10):
-    # counts the number of relevant lines in file
-    # N_segments is the number of points displayed by element
+    """
+    counts the number of relevant lines in file
+    N_segments is the number of points displayed by element
+    """
     
     it_z = 0    
     
@@ -47,8 +49,10 @@ def transport_count_lines(transport_file,N_segments = 10):
 
 
 def split_transport_file(transport_file):
-    # split file between different beamline sections
-    # saves the output files in the current folder
+    """
+    split file between different beamline sections
+    saves the output files in the current folder
+    """
     
     with open(transport_file) as infile, open('transport_file_ESS.txt', 'w') as outfile:
         copy = False
@@ -148,9 +152,10 @@ def GTR_layout_from_transport(transport_file,coord,refE):
 
 
 def Brho_scale_transport(transport_file,newE,new_file_path="D:/temp/",rest_mass=938):
-    # B rho scaling from a transport file
-    # code will fail if no line "1.xxxx" is found before other elements (which should never happen)
-    
+    """
+    B rho scaling from a transport file
+    code will fail if no line "1.xxxx" is found before other elements (which should never happen)
+    """
     
     filename = os.path.basename(transport_file)
     filename_noext = os.path.splitext(filename)[0] + "_" + str(newE) + "MeV" + ".txt"
@@ -196,11 +201,11 @@ def Brho_scale_transport(transport_file,newE,new_file_path="D:/temp/",rest_mass=
            
     
 
-def transport_input(transport_file,beam,refE,it_p,N_segments,gap,k1,k2,z,it_z,scaling_ratio = 1,kill_lost_particles=True):
-    # opens a transport file and computes beam through magnets for one particle
-    # scaling_ratio can be used to make a Brho scaling of the transport file
-    
-    
+def transport_input(transport_file,beam,refE,it_p,N_segments,gap,k1,k2,z,it_z,scaling_ratio = 1,kill_lost_particles=True,gap_X=1,paraxial_correction = False,dpz_tolerance=10**-6):
+    """
+    opens a transport file and computes beam through magnets for one particle
+    scaling_ratio can be used to make a Brho scaling of the transport file
+    """
     
     # default settings
     B = 0
@@ -229,7 +234,7 @@ def transport_input(transport_file,beam,refE,it_p,N_segments,gap,k1,k2,z,it_z,sc
                        if data_prev[0] == "4.":
                            # exit pole face (entrance managed within 4.0)
                            angle = float(data[1].replace(";","") )
-                           [beam[:,:,it_p],it_z] = pole_face(angle,B,gap,k1,k2,beam[:,:,it_p],refE,it_z)
+                           [beam[:,:,it_p],it_z] = pole_face(angle,B,gap,k1,k2,beam[:,:,it_p],refE,it_z, paraxial_correction = paraxial_correction)
                            
                            
                if data[0][0:2] == "3.":
@@ -250,11 +255,12 @@ def transport_input(transport_file,beam,refE,it_p,N_segments,gap,k1,k2,z,it_z,sc
                    if data_prev :
                        if data_prev[0] == "2.": # entrance pole face
                            angle = float(data_prev[1].replace(";","") )
-                           [beam[:,:,it_p],it_z] = pole_face(angle,B,gap,k1,k2,beam[:,:,it_p],refE,it_z)
+                           [beam[:,:,it_p],it_z] = pole_face(angle,B,gap,k1,k2,beam[:,:,it_p],refE,it_z, paraxial_correction = paraxial_correction)
                            
                    
                    
-                   [beam[:,:,it_p],it_z] = sec_bend(L,B,n,gap,beam[:,:,it_p],refE,it_z,N_segments,kill_lost_particles)
+                   [beam[:,:,it_p],it_z] = sec_bend(L,B,n,gap,beam[:,:,it_p],refE,it_z,N_segments=N_segments, \
+                   kill_lost_particles=kill_lost_particles,gap_X=gap_X,paraxial_correction = paraxial_correction, dpz_tolerance=dpz_tolerance)
                    
                    
                if data[0][0:2] == "5.": 
@@ -263,7 +269,10 @@ def transport_input(transport_file,beam,refE,it_p,N_segments,gap,k1,k2,z,it_z,sc
                    B = float(data[2].replace(";","") )*scaling_ratio
                    a = float(data[3].replace(";","") )/1000 # aperture converted to meters
                    
-                   [beam[:,:,it_p],it_z] = quad(L,B,a,beam[:,:,it_p],it_z,refE,N_segments,kill_lost_particles)
+                   #[beam[:,:,it_p],it_z] = quad(L,B,a,beam[:,:,it_p],it_z,refE,N_segments,kill_lost_particles)
+                   
+                   [beam[:,:,it_p],it_z] = quad(L,B,a,beam[:,:,it_p],it_z,refE,N_segments=N_segments, \
+                   kill_lost_particles=kill_lost_particles,paraxial_correction=paraxial_correction,dpz_tolerance=dpz_tolerance)
                    
                
                if data[0][0:3] == "18.": 
@@ -407,138 +416,112 @@ def RF_cavity_old(delta_E,freq,phi,beam,refE,it_z):
     
 
 
-def combined_magnet(L,B_dipole,G_quad,radius,beam,refE,it_z,pole_in=0,pole_out=0,k1=0.5,k2=0,N_segments = 10,kill_lost_particles=True):
-    # magnet combining different orders (default dipole + quadrupole)
-    # assumes we can multiply the matrices (small segments)
+
+
+
+
+def quad(L,B,a,beam,it_z,refE,N_segments = 10,kill_lost_particles=True,rest_mass=938, \
+          paraxial_correction = False, dpz_tolerance=10**-6):
+    """
+    L =length, B=field, a=aperture
+    kill_lost_particles=True will kill particles outside the good field region
+    paraxial_correction = True will scale the fields according to take into account the fact that pz != p
+    the relative tolerace is dpz_tolerance
+    """
     
     L_segment = L/N_segments
     ref_p = EtoP(refE)
     p = ref_p + beam[it_z,6]*ref_p
-    E = PtoE(p)
-    gamma = PtoGamma(p,938)
     
-    Brho  = 1/300*sqrt(E**2+2*938*E)
-    
-    
-    if B_dipole>0:
-        [beam, it_z] = pole_face(pole_in,B_dipole,radius,k1,k2,beam,refE,it_z)
-    
-    
-    h = B_dipole/Brho
-    kx = h 
-    if B_dipole != 0:
-        bend_mat = np.array([[cos(kx*L_segment),1/kx*sin(kx*L_segment),0,0,0,h/kx**2*(1-cos(kx*L_segment))],
-                          [-kx*sin(kx*L_segment),cos(kx*L_segment),0,0,0,h/kx*sin(kx*L_segment)],
-                          [0,0,1,L_segment,0,0],
-                          [0,0,0,1,0,0],
-                          [-h/kx*sin(kx*L_segment),-h/kx**2*(1-cos(kx*L_segment)),0,0,1,-h**2/kx**3*(kx*L_segment-sin(kx*L_segment))],
-                          [0,0,0,0,0,1]])
-    else:
-        bend_mat = np.identity(6)
-    
-    
-    k_q = sqrt(abs(G_quad)*(1/Brho)) + 10**-15
-    if G_quad>0: 
-        # X focusing
-        quad_mat = np.array([[cos(k_q*L_segment),1/k_q*sin(k_q*L_segment),0,0,0,0],
-                              [-k_q*sin(k_q*L_segment),cos(k_q*L_segment),0,0,0,0],
-                            [0,0,cosh(k_q*L_segment),1/k_q*sinh(k_q*L_segment),0,0],
-                            [0,0,k_q*sinh(k_q*L_segment),cosh(k_q*L_segment),0,0],
-                            [0,0,0,0,1,L_segment/gamma**2],
-                            [0,0,0,0,0,1]])
-    elif G_quad<0:
-        # Y focusing
-        quad_mat = np.array([[cosh(k_q*L_segment),1/k_q*sinh(k_q*L_segment),0,0,0,0],
-                              [k_q*sinh(k_q*L_segment),cosh(k_q*L_segment),0,0,0,0],
-                            [0,0,cos(k_q*L_segment),1/k_q*sin(k_q*L_segment),0,0],
-                            [0,0,-k_q*sin(k_q*L_segment),cos(k_q*L_segment),0,0],
-                            [0,0,0,0,1,L_segment/gamma**2],
-                            [0,0,0,0,0,1]])
-    else:
-        quad_mat = np.identity(6)
-    
-    comb_mat = 1/2*(np.matmul(bend_mat,quad_mat) + np.matmul(quad_mat,bend_mat))
     
     for i in range(0,N_segments):
         
-        
-        if kill_lost_particles and (sqrt(beam[it_z,1]**2 + beam[it_z,3]**2) >= radius):
+        if np.isnan(beam[it_z,1]) or (kill_lost_particles and (sqrt(beam[it_z,1]**2 + beam[it_z,3]**2) >= a)):
             # lost particle
             it_z = it_z + 1
             beam[it_z,0] = beam[it_z-1,0] + L_segment
             beam[it_z,1:7] = np.nan            
         else:
-            it_z = it_z + 1
-            beam[it_z,0] = beam[it_z-1,0] + L_segment
-            beam[it_z,1:7] = np.matmul(comb_mat,np.transpose(beam[it_z-1,1:7]))
+            if paraxial_correction :
+                corr_fact = sqrt(beam[it_z,2]**2+beam[it_z,4]**2+1)
+                B_corrected = B / corr_fact
+            else:
+                corr_fact = 1
+                B_corrected = B
             
-            L_eff = abs(L_segment/cos(sqrt(beam[it_z,2]**2+beam[it_z,4]**2))) # effective length travelled by particle (neglect change in direction)
-            beam[it_z,5] = (L_segment - L_eff) + beam[it_z,5] #higher order correction related to beam angle
+            quad_mat = quad_matrix(L_segment,B_corrected,a,p,rest_mass)
+            
+            new_beam = np.matmul(quad_mat,np.transpose(beam[it_z,1:7]))
+            
+            
+            
+            if abs(sqrt(new_beam[1]**2+new_beam[3]**2+1) - corr_fact) > dpz_tolerance and paraxial_correction :
+                # need more intermediate points
+                
+                intermediate_segments = int(abs(sqrt(new_beam[1]**2+new_beam[3]**2+1) - corr_fact) / dpz_tolerance ) + 1
+                
+                
+                new_beam = beam[it_z,1:7]
+                for j in range(0,intermediate_segments):
+                    corr_fact = sqrt(new_beam[1]**2+new_beam[3]**2+1)
+                    B_corrected = B / corr_fact
+                    quad_mat = quad_matrix(L_segment/intermediate_segments,B_corrected,a,p,rest_mass)
+                    
+                    new_beam = np.matmul(quad_mat,np.transpose(new_beam))
+                
+                it_z = it_z + 1
+                beam[it_z,0] = beam[it_z-1,0] + L_segment
+                beam[it_z,1:7] = new_beam
+            else:
+                it_z = it_z + 1
+                beam[it_z,0] = beam[it_z-1,0] + L_segment
+                beam[it_z,1:7] = np.matmul(quad_mat,np.transpose(beam[it_z-1,1:7]))
+                
+                L_eff = abs(L_segment/cos(sqrt(beam[it_z,2]**2+beam[it_z,4]**2))) # effective length travelled by particle (neglect change in direction)
+                beam[it_z,5] = (L_segment - L_eff) + beam[it_z,5] #higher order correction related to beam angle
+
+            
     
-    
-    if B_dipole>0:
-        [beam, it_z] = pole_face(pole_out,B_dipole,radius,k1,k2,beam,refE,it_z)
+    p = ref_p + beam[it_z,6]*ref_p
     
     return [beam, it_z]
-
-
-
-
-def quad(L,B,a,beam,it_z,refE,N_segments = 10,kill_lost_particles=True):
-    # L =length, B=field, a=aperture
-    # kill_lost_particles=True will kill particles outside the good field region
     
-    L_segment = L/N_segments
-    ref_p = EtoP(refE)
-    p = ref_p + beam[it_z,6]*ref_p
-    E = PtoE(p)
-    gamma = PtoGamma(p,938)
+def quad_matrix(L,B,a,p,rest_mass=938):
+    """
+    returns the transfer matrix for a particle of momentum p
+    L =length, B=field, a=aperture
+    """
     
-    Brho  = 1/300*sqrt(E**2+2*938*E)
+    gamma = PtoGamma(p,rest_mass)
+    
+    Brho  = PtoBrho(p,rest_mass)
     #Brho  = 1/300*sqrt(refE**2+2*938*refE)
     k_q  = sqrt(abs(B)/a*(1/Brho))
     
     
     if B>0: 
         # X focusing
-        quad_mat = np.array([[cos(k_q*L_segment),1/k_q*sin(k_q*L_segment),0,0,0,0],
-                              [-k_q*sin(k_q*L_segment),cos(k_q*L_segment),0,0,0,0],
-                            [0,0,cosh(k_q*L_segment),1/k_q*sinh(k_q*L_segment),0,0],
-                            [0,0,k_q*sinh(k_q*L_segment),cosh(k_q*L_segment),0,0],
-                            [0,0,0,0,1,L_segment/gamma**2],
+        quad_mat = np.array([[cos(k_q*L),1/k_q*sin(k_q*L),0,0,0,0],
+                              [-k_q*sin(k_q*L),cos(k_q*L),0,0,0,0],
+                            [0,0,cosh(k_q*L),1/k_q*sinh(k_q*L),0,0],
+                            [0,0,k_q*sinh(k_q*L),cosh(k_q*L),0,0],
+                            [0,0,0,0,1,L/gamma**2],
                             [0,0,0,0,0,1]])
     else:
         # Y focusing
-        quad_mat = np.array([[cosh(k_q*L_segment),1/k_q*sinh(k_q*L_segment),0,0,0,0],
-                              [k_q*sinh(k_q*L_segment),cosh(k_q*L_segment),0,0,0,0],
-                            [0,0,cos(k_q*L_segment),1/k_q*sin(k_q*L_segment),0,0],
-                            [0,0,-k_q*sin(k_q*L_segment),cos(k_q*L_segment),0,0],
-                            [0,0,0,0,1,L_segment/gamma**2],
+        quad_mat = np.array([[cosh(k_q*L),1/k_q*sinh(k_q*L),0,0,0,0],
+                              [k_q*sinh(k_q*L),cosh(k_q*L),0,0,0,0],
+                            [0,0,cos(k_q*L),1/k_q*sin(k_q*L),0,0],
+                            [0,0,-k_q*sin(k_q*L),cos(k_q*L),0,0],
+                            [0,0,0,0,1,L/gamma**2],
                             [0,0,0,0,0,1]])
     
-    
-    for i in range(0,N_segments):
-        
-        
-        if kill_lost_particles and (sqrt(beam[it_z,1]**2 + beam[it_z,3]**2) >= a):
-            # lost particle
-            it_z = it_z + 1
-            beam[it_z,0] = beam[it_z-1,0] + L_segment
-            beam[it_z,1:7] = np.nan            
-        else:
-            it_z = it_z + 1
-            beam[it_z,0] = beam[it_z-1,0] + L_segment
-            beam[it_z,1:7] = np.matmul(quad_mat,np.transpose(beam[it_z-1,1:7]))
-            
-            L_eff = abs(L_segment/cos(sqrt(beam[it_z,2]**2+beam[it_z,4]**2))) # effective length travelled by particle (neglect change in direction)
-            beam[it_z,5] = (L_segment - L_eff) + beam[it_z,5] #higher order correction related to beam angle
-    
-    
-    return [beam, it_z]
-
+    return quad_mat
 
 def sextupole(L,B,a,alpha,beam,it_z,refE,N_segments = 10):
-    # sextupole: L =length, B=field, a=aperture, alpha = angle
+    """
+    sextupole: L =length, B=field, a=aperture, alpha = angle
+    """
     
     alpha = math.radians(alpha)
     
@@ -602,95 +585,131 @@ def sextupole(L,B,a,alpha,beam,it_z,refE,N_segments = 10):
     
     return [beam, it_z]
 
-def sec_bend(L,B,n,gap,beam,refE,it_z,N_segments = 10,kill_lost_particles=True):
-    # NEED TO CLARIFY DIFFERENCE IN EFFECTIVE LEGNTH
+
+def sec_bend_matrix(L,B,n,p,rest_mass=938):
     
-    
-#    L_segment = L/N_segments
-#    
-#    Brho  = 1/300*sqrt(refE**2+2*938*refE)
-    
-    
-    
-    L_segment = L/N_segments
-    ref_p = EtoP(refE)
-    p = ref_p + beam[it_z,6]*ref_p
-    E = PtoE(p)
-    
-    Brho  = 1/300*sqrt(E**2+2*938*E)
-    
-    
+    Brho  = PtoBrho(p,rest_mass)
     h = B/Brho
-    #kx  = sqrt((1-n)*h**2)
-    #ky  = sqrt(n*h**2) 
-    
     
     if n>0 and n<1:
         kx  = sqrt((1-n)*h**2)
         ky  = sqrt(n*h**2) 
-        bend_mat = np.array([[cos(kx*L_segment),1/kx*sin(kx*L_segment),0,0,0,h/kx**2*(1-cos(kx*L_segment))],
-                              [-kx*sin(kx*L_segment),cos(kx*L_segment),0,0,0,h/kx*sin(kx*L_segment)],
-                              [0,0,cos(ky*L_segment),1/ky*sin(ky*L_segment),0,0],
-                              [0,0,-ky*sin(ky*L_segment),cos(ky*L_segment),0,0],
-                              [-h/kx*sin(kx*L_segment),-h/kx**2*(1-cos(kx*L_segment)),0,0,1,-h**2/kx**3*(kx*L_segment-sin(kx*L_segment))],
+        bend_mat = np.array([[cos(kx*L),1/kx*sin(kx*L),0,0,0,h/kx**2*(1-cos(kx*L))],
+                              [-kx*sin(kx*L),cos(kx*L),0,0,0,h/kx*sin(kx*L)],
+                              [0,0,cos(ky*L),1/ky*sin(ky*L),0,0],
+                              [0,0,-ky*sin(ky*L),cos(ky*L),0,0],
+                              [-h/kx*sin(kx*L),-h/kx**2*(1-cos(kx*L)),0,0,1,-h**2/kx**3*(kx*L-sin(kx*L))],
                               [0,0,0,0,0,1]])
     elif n>1:
         kx  = sqrt(-(1-n)*h**2) #complex value --> change sign and forumulas
         ky  = sqrt(n*h**2) 
-        bend_mat = np.array([[cosh(kx*L_segment),1/kx*sinh(kx*L_segment),0,0,0,-h/kx**2*(1-cosh(kx*L_segment))],
-                              [kx*sinh(kx*L_segment),cosh(kx*L_segment),0,0,0,h/kx*sinh(kx*L_segment)],
-                              [0,0,cos(ky*L_segment),1/ky*sin(ky*L_segment),0,0],
-                              [0,0,-ky*sin(ky*L_segment),cos(ky*L_segment),0,0],
-                              [-h/kx*sinh(kx*L_segment),h/kx**2*(1-cosh(kx*L_segment)),0,0,1,h**2/kx**3*(kx*L_segment-sinh(kx*L_segment))],
+        bend_mat = np.array([[cosh(kx*L),1/kx*sinh(kx*L),0,0,0,-h/kx**2*(1-cosh(kx*L))],
+                              [kx*sinh(kx*L),cosh(kx*L),0,0,0,h/kx*sinh(kx*L)],
+                              [0,0,cos(ky*L),1/ky*sin(ky*L),0,0],
+                              [0,0,-ky*sin(ky*L),cos(ky*L),0,0],
+                              [-h/kx*sinh(kx*L),h/kx**2*(1-cosh(kx*L)),0,0,1,h**2/kx**3*(kx*L-sinh(kx*L))],
                               [0,0,0,0,0,1]])
     elif n<0:
         kx  = sqrt((1-n)*h**2)
         ky  = sqrt(-n*h**2) #complex value --> change sign and forumulas
-        bend_mat = np.array([[cos(kx*L_segment),1/kx*sin(kx*L_segment),0,0,0,h/kx**2*(1-cos(kx*L_segment))],
-                              [-kx*sin(kx*L_segment),cos(kx*L_segment),0,0,0,h/kx*sin(kx*L_segment)],
-                              [0,0,cosh(ky*L_segment),1/ky*sinh(ky*L_segment),0,0],
-                              [0,0,ky*sinh(ky*L_segment),cosh(ky*L_segment),0,0],
-                              [-h/kx*sin(kx*L_segment),-h/kx**2*(1-cos(kx*L_segment)),0,0,1,-h**2/kx**3*(kx*L_segment-sin(kx*L_segment))],
+        bend_mat = np.array([[cos(kx*L),1/kx*sin(kx*L),0,0,0,h/kx**2*(1-cos(kx*L))],
+                              [-kx*sin(kx*L),cos(kx*L),0,0,0,h/kx*sin(kx*L)],
+                              [0,0,cosh(ky*L),1/ky*sinh(ky*L),0,0],
+                              [0,0,ky*sinh(ky*L),cosh(ky*L),0,0],
+                              [-h/kx*sin(kx*L),-h/kx**2*(1-cos(kx*L)),0,0,1,-h**2/kx**3*(kx*L-sin(kx*L))],
                               [0,0,0,0,0,1]])
     elif n==1: #kx=0
         ky  = sqrt(n*h**2) 
-        bend_mat = np.array([[1,L_segment,0,0,0,0],
+        bend_mat = np.array([[1,L,0,0,0,0],
                               [0,1,0,0,0,0],
-                              [0,0,cos(ky*L_segment),1/ky*sin(ky*L_segment),0,0],
-                              [0,0,-ky*sin(ky*L_segment),cos(ky*L_segment),0,0],
-                              [-h*L_segment,-h*L_segment**2/2,0,0,1,-h**2*L_segment**3/6],
+                              [0,0,cos(ky*L),1/ky*sin(ky*L),0,0],
+                              [0,0,-ky*sin(ky*L),cos(ky*L),0,0],
+                              [-h*L,-h*L**2/2,0,0,1,-h**2*L**3/6],
                               [0,0,0,0,0,1]])
     elif n==0:
         kx  = sqrt((1-n)*h**2) #ky=0
-        bend_mat = np.array([[cos(kx*L_segment),1/kx*sin(kx*L_segment),0,0,0,h/kx**2*(1-cos(kx*L_segment))],
-                              [-kx*sin(kx*L_segment),cos(kx*L_segment),0,0,0,h/kx*sin(kx*L_segment)],
-                              [0,0,1,L_segment,0,0],
+        bend_mat = np.array([[cos(kx*L),1/kx*sin(kx*L),0,0,0,h/kx**2*(1-cos(kx*L))],
+                              [-kx*sin(kx*L),cos(kx*L),0,0,0,h/kx*sin(kx*L)],
+                              [0,0,1,L,0,0],
                               [0,0,0,1,0,0],
-                              [-h/kx*sin(kx*L_segment),-h/kx**2*(1-cos(kx*L_segment)),0,0,1,-h**2/kx**3*(kx*L_segment-sin(kx*L_segment))],
+                              [-h/kx*sin(kx*L),-h/kx**2*(1-cos(kx*L)),0,0,1,-h**2/kx**3*(kx*L-sin(kx*L))],
                               [0,0,0,0,0,1]])
+    
+    return bend_mat
+
+
+
+
+
+def sec_bend(L,B,n,gap,beam,refE,it_z,N_segments = 10,kill_lost_particles=True,rest_mass=938,gap_X=1, \
+          paraxial_correction = False, dpz_tolerance=10**-6):
+    """
+    L =length, B=field, a=aperture
+    kill_lost_particles=True will kill particles outside the good field region
+    paraxial_correction = True will scale the fields according to take into account the fact that pz != p
+    the relative tolerace is dpz_tolerance
+    """
+    
+    L_segment = L/N_segments
+    ref_p = EtoP(refE)
+    p = ref_p + beam[it_z,6]*ref_p
     
     
     for i in range(0,N_segments):
         
-        if kill_lost_particles and abs(beam[it_z,3]) >= gap:
+        if np.isnan(beam[it_z,1]) or (kill_lost_particles and (abs(beam[it_z,1]) >= gap_X or abs(beam[it_z,3]) >= gap)):
             # lost particle
             it_z = it_z + 1
             beam[it_z,0] = beam[it_z-1,0] + L_segment
-            beam[it_z,1:7] = np.nan
-            
+            beam[it_z,1:7] = np.nan            
         else:
-            it_z = it_z + 1
-            beam[it_z,0] = beam[it_z-1,0] + L_segment
-            beam[it_z,1:7] = np.matmul(bend_mat,np.transpose(beam[it_z-1,1:7]))
+            if paraxial_correction :
+                corr_fact = sqrt(beam[it_z,2]**2+beam[it_z,4]**2+1)
+                B_corrected = B / corr_fact
+            else:
+                corr_fact = 1
+                B_corrected = B
+            
+            bend_mat = sec_bend_matrix(L_segment,B_corrected,n,p,rest_mass)
+            
+            new_beam = np.matmul(bend_mat,np.transpose(beam[it_z,1:7]))
+            
+            
+            
+            if abs(sqrt(new_beam[1]**2+new_beam[3]**2+1) - corr_fact) > dpz_tolerance and paraxial_correction :
+                # need more intermediate points
+                
+                intermediate_segments = int(abs(sqrt(new_beam[1]**2+new_beam[3]**2+1) - corr_fact) / dpz_tolerance ) + 1
+                
+                new_beam = beam[it_z,1:7]
+                for j in range(0,intermediate_segments):
+                    corr_fact = sqrt(new_beam[1]**2+new_beam[3]**2+1)
+                    B_corrected = B / corr_fact
+                    
+                    bend_mat = sec_bend_matrix(L_segment/intermediate_segments,B_corrected,n,p,rest_mass)
+                    
+                    new_beam = np.matmul(bend_mat,np.transpose(new_beam))
+                
+                it_z = it_z + 1
+                beam[it_z,0] = beam[it_z-1,0] + L_segment
+                beam[it_z,1:7] = new_beam
+            else:
+                it_z = it_z + 1
+                beam[it_z,0] = beam[it_z-1,0] + L_segment
+                beam[it_z,1:7] = np.matmul(bend_mat,np.transpose(beam[it_z-1,1:7]))
+                
+            
     
+    p = ref_p + beam[it_z,6]*ref_p
     
     return [beam, it_z]
 
 
-def pole_face(angle,B,gap,k1,k2,beam,refE,it_z):
-    # k1 and k2 related to frindge field properties; default k1=0.5, k2=0
-    # see SLAC transport manual
-    
+def pole_face(angle,B,gap,k1,k2,beam,refE,it_z,paraxial_correction = False):
+    """
+    k1 and k2 related to frindge field properties; default k1=0.5, k2=0
+    see SLAC transport manual
+    """
     
     ref_p = EtoP(refE)
     p = ref_p + beam[it_z,6]*ref_p
@@ -698,7 +717,14 @@ def pole_face(angle,B,gap,k1,k2,beam,refE,it_z):
     
     Brho  = 1/300*sqrt(E**2+2*938*E)
     
-    radius = Brho/B
+    if paraxial_correction :
+        corr_fact = sqrt(beam[it_z,2]**2+beam[it_z,4]**2+1)
+        B_corrected = B / corr_fact
+    else:
+        B_corrected = B
+    
+    
+    radius = Brho/B_corrected
     
     beta = math.radians(angle)
     
@@ -718,19 +744,30 @@ def pole_face(angle,B,gap,k1,k2,beam,refE,it_z):
     beam[it_z,0] = beam[it_z-1,0]
     beam[it_z,1:7] = np.matmul(pole_mat,np.transpose(beam[it_z-1,1:7]))
     
+    
+    
+    
     return [beam, it_z]
 
 
 
 
-def bending(L,B,n,pole_in,pole_out,gap,k1,k2,beam,refE,it_z,N_segments = 10,kill_lost_particles=True):
-    #kill_lost_particles will kill particles that are beyond the gap opening in Y
+def bending(L,B,n,pole_in,pole_out,gap,k1,k2,beam,refE,it_z,N_segments = 10,kill_lost_particles=True,gap_X=1,paraxial_correction = False, dpz_tolerance=10**-6):
+    """
+    kill_lost_particles will kill particles that are beyond the gap opening in Y
+    horizontal gap is used to kill particles that are too far; default = 1 m
+    paraxial_correction = True will scale the fields according to take into account the fact that pz != p
+    the relative tolerace is dpz_tolerance
+    """
     
-    [beam, it_z] = pole_face(pole_in,B,gap,k1,k2,beam,refE,it_z)
+    [beam, it_z] = pole_face(pole_in,B,gap,k1,k2,beam,refE,it_z,paraxial_correction = paraxial_correction)
     
-    [beam, it_z] = sec_bend(L,B,n,gap,beam,refE,it_z,N_segments,kill_lost_particles)
+    #[beam, it_z] = sec_bend(L,B,n,gap,beam,refE,it_z,N_segments,kill_lost_particles,gap_X)
     
-    [beam, it_z]= pole_face(pole_out,B,gap,k1,k2,beam,refE,it_z)
+    [beam, it_z] = sec_bend(L,B,n,gap,beam,refE,it_z,N_segments = N_segments,kill_lost_particles=kill_lost_particles,gap_X=gap_X, \
+          paraxial_correction = paraxial_correction, dpz_tolerance=dpz_tolerance)
+    
+    [beam, it_z]= pole_face(pole_out,B,gap,k1,k2,beam,refE,it_z,paraxial_correction = paraxial_correction)
 
     return [beam, it_z]
 
@@ -945,7 +982,7 @@ def rotation(beam,angle):
     return beam
     
 def Highland(L_m,mat,beam_in,refE):
-    # computes scattering angle
+    """computes scattering angle"""
 
     ref_p = EtoP(refE)
     p = ref_p + beam_in[5]*ref_p
@@ -1022,7 +1059,7 @@ def Highland(L_m,mat,beam_in,refE):
 
 
 def PtoGamma(p,rest_mass=938):
-    # impulsion (in Mev/c) to gamma factor
+    """impulsion (in Mev/c) to gamma factor"""
     
     beta = PtoBeta(p,rest_mass)
     gamma = BetatoGamma(beta)
@@ -1030,7 +1067,7 @@ def PtoGamma(p,rest_mass=938):
 
 
 def PtoV(p,rest_mass=938):
-    # impulsion (in Mev/c) to speed (in m/s)
+    """impulsion (in Mev/c) to speed (in m/s)"""
     
     light_speed = 2.998*10**8
     speed = PtoBeta(p,rest_mass)*light_speed
@@ -1038,8 +1075,7 @@ def PtoV(p,rest_mass=938):
     return speed
 
 def PtoBeta(p,rest_mass=938):
-    # impulsion (in Mev/c) to speed (in 1/c)
-    
+    """ impulsion (in Mev/c) to speed (in 1/c)"""
     beta = p/sqrt(rest_mass**2 + p**2)
     return beta
 
@@ -1058,19 +1094,19 @@ def GammatoBeta(gamma):
 
 
 def BetatoP(beta,rest_mass=938):
-    # returns p in [MeV/c]
+    """ returns p in [MeV/c]"""
     gamma = BetatoGamma(beta)
     return beta*gamma*rest_mass
 
 
 def EtoP(E,rest_mass=938):
-    #energy to impulsion
+    """energy to impulsion"""
     p = sqrt(E**2 + 2*rest_mass*E)
     
     return p
   
 def PtoE(p,rest_mass=938):
-    #energy to impulsion
+    """energy to impulsion"""
     E = sqrt(p**2 + rest_mass**2) - rest_mass
     
     return E          
@@ -1087,6 +1123,9 @@ def EtoBrho(E,rest_mass=938):
     Brho  = 1/299.8*sqrt(E**2+2*rest_mass*E)
     return Brho
 
+def PtoBrho(p,rest_mass=938):
+    Brho  = 1/299.8*p
+    return Brho
 
 def Brho_scaling(refE,newE,rest_mass=938):
     refBrho = 1/299.8*sqrt(refE**2+2*rest_mass*refE)
@@ -1096,7 +1135,9 @@ def Brho_scaling(refE,newE,rest_mass=938):
     
 
 def Gaussian_fit(data,p0):
-    # p0 is the initial guess for the fitting coefficients (A, mu and sigma above)# p0 is the initial guess for the fitting coefficients (A, mu and sigma below)
+    """
+    p0 is the initial guess for the fitting coefficients (A, mu and sigma above)# p0 is the initial guess for the fitting coefficients (A, mu and sigma below)
+    """
     
     # Define model function to be used to fit to the data above:
     def gauss(x, *p):

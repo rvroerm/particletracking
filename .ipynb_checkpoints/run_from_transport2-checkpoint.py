@@ -8,8 +8,7 @@ from math import sqrt
 import numpy as np
 import matplotlib.pyplot as plt
 from transfer_functions import transport_input, transport_count_lines, EtoP, GTR_layout_from_transport, PtoE, Brho_scaling, split_transport_file, gaussian
-from fits import funcGaussian, errorFuncGaussian, funcDoubleGaussian, errorFuncDoubleGaussian
-from scipy.optimize import curve_fit, leastsq
+from scipy.optimize import curve_fit
 from scipy.stats import norm
 
 
@@ -24,15 +23,13 @@ input_file = "C:/TRANS/for001.dat"
 
 split_transport_file(input_file)
 
-paraxial_correction = False
-dpzTolerance = 10**-4
 
 gap = 0.03
 k1 = 0.5
 k2 = 0
 
-old_refE = 160 # default energy considered for fields bleow 
-refE = 160
+old_refE = 230 # default energy considered for fields bleow 
+refE = 230
 ref_p = EtoP(refE)
 Brho  = 1/300*sqrt(refE**2+2*938*refE)
 
@@ -40,7 +37,7 @@ Brho  = 1/300*sqrt(refE**2+2*938*refE)
 Brho_factor = Brho_scaling(old_refE,refE)    
 
 kill_lost_particles = True
-gapX = gap # case of CCT magnets
+
 
 #######################################
 # compute GTR drawing
@@ -73,11 +70,11 @@ for i in range(0,nb_part):
     #sizeX = 0.00001
     #sizeY = 0.00001
     
-    divX = np.random.normal(0,0.05/2.35*2) #+-50 mrad FWMH
-    divY = np.random.normal(0,0.05/2.35*2)
+    #divX = np.random.normal(0,0.1/2.35) #100 mrad FWMH
+    #divY = np.random.normal(0,0.1/2.35)
     
-    #divX = np.random.uniform(-0.05,0.05)
-    #divY = np.random.uniform(-0.05,0.05)
+    divX = np.random.uniform(-0.05,0.05)
+    divY = np.random.uniform(-0.05,0.05)
     
     #divX = 0.05*np.random.choice([-1,0,1])
     #divY = 0.05*np.random.choice([-1,0,1])
@@ -88,7 +85,7 @@ for i in range(0,nb_part):
     #divX=0
     #divY=0
     
-    E = refE + 5*np.random.normal(0,1)
+    E = refE + 10*np.random.normal(0,1)
     E = refE + 1.5*np.random.uniform(-1,1)
     #E = refE + 1.5*np.random.choice([-1,0,1])
     E = refE + 5*(i-nb_part/2)/nb_part*2
@@ -118,10 +115,8 @@ last_itz = it_z
 
 for i in range(0,nb_part):  
     it_z = last_itz 
-    
-    [beam,it_z] = transport_input('transport_file_ESS.txt',beam,refE,i,N_segments,gap,k1,k2,last_z,last_itz,Brho_factor,kill_lost_particles,gap_X=gapX,paraxial_correction=paraxial_correction,dpz_tolerance=dpzTolerance)
-    
-
+    [beam,it_z] = transport_input('transport_file_ESS.txt',beam,refE,i,N_segments,gap,k1,k2,last_z,last_itz,Brho_factor,kill_lost_particles)
+ 
 
 E_list_in = np.vectorize(PtoE)(ref_p*(1+beam[0,6,:]))
 DeltaE = refE/100
@@ -130,8 +125,6 @@ nb_part_in_ESS2 = ((E_list_in < refE+2*DeltaE) & (E_list_in > refE-2*DeltaE)).su
 
 E_list_out_ESS = np.vectorize(PtoE)(ref_p*(1+beam[it_z,6,:]))
 E_list_out_ESS[np.isnan(E_list_out_ESS)] = 0 
-
-
 
 
 nb_part_out_ESS = ((E_list_out_ESS < refE+DeltaE) & (E_list_out_ESS > refE-DeltaE)).sum()
@@ -147,7 +140,7 @@ it_z_GTR = it_z
 
 for i in range(0,nb_part):  
     it_z = last_itz 
-    [beam,it_z] = transport_input('transport_file_GTR.txt',beam,refE,i,N_segments,gap,k1,k2,last_z,last_itz,Brho_factor,kill_lost_particles,gap_X=gapX,dpz_tolerance=dpzTolerance)
+    [beam,it_z] = transport_input('transport_file_GTR.txt',beam,refE,i,N_segments,gap,k1,k2,last_z,last_itz,Brho_factor,kill_lost_particles)
 
         
 
@@ -160,7 +153,7 @@ E_list_out_GTR[np.isnan(E_list_out_GTR)] = 0
 
 nb_part_out_GTR = ((E_list_out_GTR < refE+DeltaE) & (E_list_out_GTR > refE-DeltaE)).sum()
 
-print('GTR efficiency within 1% E range [',refE-DeltaE,',',refE+DeltaE,']  = ',nb_part_out_GTR/max(nb_part_out_ESS,1)*100,'%')
+print('GTR efficiency within E range [',refE-DeltaE,',',refE+DeltaE,']  = ',nb_part_out_GTR/max(nb_part_out_ESS,1)*100,'%')
 print('total efficiency within 1% E range [',refE-DeltaE,',',refE+DeltaE,']  = ',nb_part_out_GTR/max(nb_part_in_ESS,1)*100,'%')
 
 nb_part_out_GTR2 = ((E_list_out_GTR < refE+2*DeltaE) & (E_list_out_GTR > refE-2*DeltaE)).sum()
@@ -192,66 +185,25 @@ plt.grid(which='major')
 
 plt.figure(4)
 
-# filter NaN values
-X_iso_filtered = beam[it_z,1,:][~np.isnan(beam[it_z,1,:])]
-Y_iso_filtered = beam[it_z,3,:][~np.isnan(beam[it_z,3,:])]
-
-## add filter on central values for the fit
-#maskX = np.logical_and(X_iso_filtered < 0.01,X_iso_filtered>-0.01)
-#maskY = np.logical_and(Y_iso_filtered < 0.01,Y_iso_filtered>-0.01)
-#
-#(muX, sigmaX) = norm.fit(X_iso_filtered[maskX])
-#print('mu X = ',muX,' , sigma X = ',sigmaX)
-#(muY, sigmaY) = norm.fit(Y_iso_filtered[maskY])
-#print('mu Y = ',muY,' , sigma Y = ',sigmaY)
+(muX, sigmaX) = norm.fit(beam[it_z,1,:][~np.isnan(beam[it_z,1,:])])
+print('mu X = ',muX,' , sigma X = ',sigmaX)
+(muY, sigmaY) = norm.fit(beam[it_z,3,:][~np.isnan(beam[it_z,3,:])])
+print('mu Y = ',muY,' , sigma Y = ',sigmaY)
 
 
 nb_bins = 100
 
-n, bins, patches = plt.hist(X_iso_filtered,nb_bins,range=(-0.03,0.03),alpha=0.5,label="X")
-X_spot = [bins[:-1], n]
+n, bins, patches = plt.hist(beam[it_z,1,:],nb_bins,range=(-0.03,0.03),alpha=0.5,label="X")
+hist_area = np.sum(n)*(max(bins)-min(bins))/len(bins)
+# add a 'best fit' line
+y = norm.pdf(bins, loc=muX, scale=sigmaX)*hist_area
+plt.plot(bins, y, 'b--', linewidth=2,label='X fit: \u03BC = {:.2f} mm, \u03C3 = {:.2f} mm'.format(muX*1000,sigmaX*1000))
 
-#hist_area = np.sum(n)*(max(bins)-min(bins))/len(bins)
-## add a 'best fit' line
-#y = norm.pdf(bins, loc=muX, scale=sigmaX)*hist_area
-#plt.plot(bins, y, 'b--', linewidth=2,label='X fit: \u03BC = {:.2f} mm, \u03C3 = {:.2f} mm'.format(muX*1000,sigmaX*1000))
-
-# make a Gaussian fit
-#tplInitial contains the "first guess" of the parameters 
-param_initial=[100,0,0.003]
-param_final,success = leastsq(errorFuncGaussian,param_initial[:],args=(X_spot[:][0],X_spot[:][1]))
-(muX,sigmaX) = param_final[1:3]
-print('mu X = ',muX,' , sigma X = ',sigmaX)
-plt.plot(X_spot[:][0],funcGaussian(param_final,X_spot[:][0]),'b--',label='X fit: \u03BC = {:.2f} mm, \u03C3 = {:.2f} mm'.format(muX*1000,sigmaX*1000))
-
-# double Gaussian fit
-param_initial=[100,0,0.003,10,0,0.01]
-param_final,success = leastsq(errorFuncDoubleGaussian,param_initial[:],args=(X_spot[:][0],X_spot[:][1]))
-print('double Gaussian X: ',param_final)
-plt.plot(X_spot[:][0],funcDoubleGaussian(param_final,X_spot[:][0]),'b:',label='double Gaussian')
-
-
-
-n, bins, patches = plt.hist(Y_iso_filtered,nb_bins,range=(-0.03,0.03),alpha=0.5,label="Y")
-Y_spot = [bins[:-1], n]
-
-##hist_area = np.sum(n)*(max(bins)-min(bins))/len(bins)
-## add a 'best fit' line
-#y = norm.pdf(bins, loc=muY, scale=sigmaY)*hist_area
-#plt.plot(bins, y, 'r--', linewidth=2,label='Y fit: \u03BC = {:.2f} mm, \u03C3 = {:.2f} mm'.format(muY*1000,sigmaY*1000))
-
-param_initial=[100,0,0.003]
-param_final,success = leastsq(errorFuncGaussian,param_initial[:],args=(Y_spot[:][0],Y_spot[:][1]))
-(muY,sigmaY) = param_final[1:3]
-print('mu Y = ',muY,' , sigma Y = ',sigmaY)
-plt.plot(Y_spot[:][0],funcGaussian(param_final,Y_spot[:][0]),'r--',label='Y fit: \u03BC = {:.2f} mm, \u03C3 = {:.2f} mm'.format(muY*1000,sigmaY*1000))
-
-
-# double Gaussian fit
-param_initial=[100,0,0.003,10,0,0.01]
-param_final,success = leastsq(errorFuncDoubleGaussian,param_initial[:],args=(Y_spot[:][0],Y_spot[:][1]))
-print('double Gaussian Y: ',param_final)
-plt.plot(Y_spot[:][0],funcDoubleGaussian(param_final,Y_spot[:][0]),'r:',label='double Gaussian')
+n, bins, patches = plt.hist(beam[it_z,3,:],nb_bins,range=(-0.03,0.03),alpha=0.5,label="Y")
+hist_area = np.sum(n)*(max(bins)-min(bins))/len(bins)
+# add a 'best fit' line
+y = norm.pdf(bins, loc=muY, scale=sigmaY)*hist_area
+plt.plot(bins, y, 'r--', linewidth=2,label='Y fit: \u03BC = {:.2f} mm, \u03C3 = {:.2f} mm'.format(muY*1000,sigmaY*1000))
 
 
 plt.legend(loc='upper right')
@@ -282,8 +234,4 @@ plt.ylabel('nb of protons (arb. units)')
 
 
 
-plt.figure(6)
-plt.scatter(beam[it_z,1,:],beam[it_z,2,:], c = np.vectorize(PtoE)(ref_p*(1+beam[0,6,:])))
-plt.xlabel('x [m]')
-plt.ylabel('divx [mrad]')
-plt.colorbar()
+

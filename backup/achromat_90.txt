@@ -1,0 +1,90 @@
+   /Test quads tracing/
+   0 
+   
+   /*change units*/
+   15. 1.0 /MM/ .1 ; (transverse dimensions in mm)
+   15. 9 'T' 10; (fields in T)
+   15. 11 'MEV' 0.001; (energy in MeV)
+   16. 3. 1835 ; (proton mass/electron mass)
+   
+   /* Initial beam*/
+   /* (Size = 10um, half-divergence=50mrad, time sigma=10ps~0.012cm, dponp=0, E=160MeV) */
+   1. 0.01 50. 0.01 50. 0.012 0 570.75 /BEAM/ ;
+   
+   
+   3. 0.1 ; (space between target and fisrt element)
+   
+   5. 0.15 -1.442 15 /Q1/ ;
+   
+   3. 0.15 ;
+   
+   5. 0.33 0.9347  40 /Q2/ ;
+   
+   3. 0.2 ; 
+   
+   5. 0.21 -0.7274 40 /Q3/ ;
+   
+   
+   3. 0.4 ;
+   
+   
+   4. 1.2 1.5 0 /B1/ ;
+   
+   3. 0.2 ;
+   
+   5. 0.2 0.4153 40 /Q4/ ;
+   
+   3. 0.2 ;
+   
+   5. 0.2 0.4153 40 /Q4/ ;
+   
+   3. 0.2 ;
+   
+   4. 1.2 1.5 0 /B1/ ;
+   
+   
+   3. 0.4 ;
+   
+   5. 0.21 -0.7274 40 /Q3/ ;
+   
+   3. 0.2 ;
+   
+   5. 0.33 0.9347  40 /Q2/ ;
+   
+   3. 0.15 ;
+   
+   5. 0.15 -1.442  15 /Q1/ ;
+   
+   
+   3. 0.1 /ESS/;
+   
+   (same as input)
+   10. 1. 1. 0.01 0.01;
+   10. 2. 2. 50 0.01; 
+   10. 3. 3. 0.01 0.01;
+   10. 4. 4. 50 0.01; 
+   10. -1. 6. 0. 0.001; (no correlation between posX and E) 
+   10. -2. 6. 0. 0.001; (no correlation between divX and E) 
+   10. -3. 6. 0. 0.001; (no correlation between posY and E) 
+   10. -4. 6. 0. 0.001; (no correlation between divY and E)
+   
+   3. 1 ;
+   
+   
+   
+   
+   
+    3. 1 ;
+   
+   /* Gantry */
+   
+   
+   
+   
+   
+   
+   SENTINEL
+   /*PLOT*/
+   -1
+   SENTINEL
+   SENTINEL

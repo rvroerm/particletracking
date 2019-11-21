@@ -91,7 +91,7 @@ for i in range(0,nb_part):
     E = refE + 5*np.random.normal(0,1)
     E = refE + 1.5*np.random.uniform(-1,1)
     #E = refE + 1.5*np.random.choice([-1,0,1])
-    E = refE + 5*(i-nb_part/2)/nb_part*2
+    E = refE + 10*(i-nb_part/2)/nb_part*2
     #E = refE +  1.5*(i-1)
     #E = refE
     
@@ -228,7 +228,7 @@ plt.plot(X_spot[:][0],funcGaussian(param_final,X_spot[:][0]),'b--',label='X fit:
 param_initial=[100,0,0.003,10,0,0.01]
 param_final,success = leastsq(errorFuncDoubleGaussian,param_initial[:],args=(X_spot[:][0],X_spot[:][1]))
 print('double Gaussian X: ',param_final)
-plt.plot(X_spot[:][0],funcDoubleGaussian(param_final,X_spot[:][0]),'b:',label='double Gaussian')
+#plt.plot(X_spot[:][0],funcDoubleGaussian(param_final,X_spot[:][0]),'b:',label='double Gaussian')
 
 
 
@@ -251,7 +251,7 @@ plt.plot(Y_spot[:][0],funcGaussian(param_final,Y_spot[:][0]),'r--',label='Y fit:
 param_initial=[100,0,0.003,10,0,0.01]
 param_final,success = leastsq(errorFuncDoubleGaussian,param_initial[:],args=(Y_spot[:][0],Y_spot[:][1]))
 print('double Gaussian Y: ',param_final)
-plt.plot(Y_spot[:][0],funcDoubleGaussian(param_final,Y_spot[:][0]),'r:',label='double Gaussian')
+#plt.plot(Y_spot[:][0],funcDoubleGaussian(param_final,Y_spot[:][0]),'r:',label='double Gaussian')
 
 
 plt.legend(loc='upper right')

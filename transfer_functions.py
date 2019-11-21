@@ -902,7 +902,9 @@ def wedge_circular(L_min,a_min,L_max,a_max,mat,N_steps,beam,it_z,refE):
 
 
 def slit(orientation,L_m,left,right,mat,beam,it_z,refE,N_segments=10):
-    # slit with 2 blades (left and right)
+    """
+    slit with 2 blades (left and right)
+    """
     
     L_segment = L_m/N_segments
     
@@ -928,7 +930,9 @@ def slit(orientation,L_m,left,right,mat,beam,it_z,refE,N_segments=10):
 
 
 def slitX(L_m,leftX,rightX,mat,beam,it_z,refE,N_segments=10):
-    # slit along X axis, with 2 blades (left and right)
+    """
+    slit along X axis, with 2 blades (left and right)
+    """
     
     L_segment = L_m/N_segments
     
@@ -937,13 +941,16 @@ def slitX(L_m,leftX,rightX,mat,beam,it_z,refE,N_segments=10):
             it_z = it_z + 1
             beam[it_z,0] = beam[it_z-1,0] + L_segment
             [beam[it_z,1:7],sigma] = Highland(L_segment,mat,beam[it_z-1,1:7],refE)
+            
         else:
             [beam,it_z] = drift(L_segment,beam,refE,it_z,1)
     
     return [beam, it_z]
 
 def collimator(L_m,a,mat,beam,it_z,refE,N_segments):
-    # L_m=collimator thickness, a=aperture radius, mat=material
+    """
+    L_m=collimator thickness, a=aperture radius, mat=material
+    """
     
     L_segment = L_m/N_segments
     
@@ -1027,6 +1034,7 @@ def Highland(L_m,mat,beam_in,refE):
         # modify energy
         p_range = EtoR(E)
         WET = L_m*100*cWET*density/cos(sqrt(beam_in[1]**2+beam_in[3]**2))
+        
         new_p_range = p_range - WET
         if new_p_range>0:
             # assume drift is independent of the scattering (i.e. impact on angle only)
@@ -1046,7 +1054,11 @@ def Highland(L_m,mat,beam_in,refE):
             new_E = RtoE(new_p_range)
             new_p = EtoP(new_E)
             
-            beam_out[5] = (new_p-ref_p)/ref_p
+            # make the same calculations for the initial energy to avoid rounding errors
+            old_E = RtoE(p_range)
+            old_p = EtoP(old_E)
+            
+            beam_out[5] = beam_out[5] + (new_p-old_p)/ref_p
             
         else:
             beam_out = np.empty(6)

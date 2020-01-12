@@ -7,14 +7,14 @@ This is a temporary script file.
 from math import sqrt
 import numpy as np
 import matplotlib.pyplot as plt
-from transfer_functions import transport_input, transport_count_lines, EtoP, GTR_layout_from_transport, PtoE, Brho_scaling, split_transport_file, gaussian
+from transfer_functions import transport_input, transport_count_lines, EtoP, PtoE, Brho_scaling, split_transport_file, gaussian
 
 from plot_beam_results import plot_beam
 
 
 
 
-plt.close('all')
+
 
 
 nb_part=1000
@@ -43,16 +43,7 @@ Brho_factor = Brho_scaling(old_refE,refE)
 kill_lost_particles = True
 gapX = gap # case of CCT magnets
 
-#######################################
-# compute GTR drawing
-nb_pts_z = transport_count_lines(input_file,1) 
-layout = np.zeros(shape=[nb_pts_z,2]) 
-layout = GTR_layout_from_transport(input_file,layout,old_refE)
-plt.figure('Gantry layout')
-plt.scatter(layout[0:nb_pts_z-1,0],layout[0:nb_pts_z-1,1])
-plt.title('Gantry layout')
-plt.xlabel('length [m]')
-plt.ylabel('heigth [m]')
+
 
 
 ########################################
@@ -75,6 +66,8 @@ for i in range(0,nb_part):
     
     #sizeX = 0.00001
     #sizeY = 0.00001
+    
+    
     
     divX = np.random.normal(0,0.05/2.35*2) #+-50 mrad FWMH
     divY = np.random.normal(0,0.05/2.35*2)
@@ -157,6 +150,19 @@ for i in range(0,nb_part):
 
 
 
+
+
+
+
+# make plots
+
+plot_beam(input_file,beam,it_z,it_z_GTR,ref_p)
+
+
+
+
+# output results
+
 E_list_out_GTR = np.vectorize(PtoE)(ref_p*(1+beam[it_z,6,:]))
 E_list_out_GTR[np.isnan(E_list_out_GTR)] = 0 
 
@@ -168,9 +174,3 @@ print('total efficiency within 1% E range [',refE-DeltaE,',',refE+DeltaE,']  = '
 
 nb_part_out_GTR2 = ((E_list_out_GTR < refE+2*DeltaE) & (E_list_out_GTR > refE-2*DeltaE)).sum()
 print('total efficiency within 2% E range [',refE-2*DeltaE,',',refE+2*DeltaE,']  = ',nb_part_out_GTR2/max(nb_part_in_ESS2,1)*100,'%')
-
-
-
-
-
-plot_beam(beam,it_z,it_z_GTR,ref_p)

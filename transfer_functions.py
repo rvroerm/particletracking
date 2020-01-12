@@ -13,10 +13,11 @@ from scipy.optimize import curve_fit
 #import matplotlib.pyplot as plt
 
 
-def transport_count_lines(transport_file,N_segments = 10):
+def transport_count_lines(transport_file,N_segments = 10,print_elements=False):
     """
     counts the number of relevant lines in file
     N_segments is the number of points displayed by element
+    print_elements = boolean to print lines read in file
     """
     
     it_z = 0    
@@ -26,25 +27,24 @@ def transport_count_lines(transport_file,N_segments = 10):
        line = fp.readline()
        cnt = 1
        while line:
-           #print("Line {}: {}".format(cnt, line.strip()))
            
            data = line.split() 
            
            if data: # string is not empty
                if  data[0][0:2] == "4." or data[0][0:2] == "5." or data[0][0:3] == "50." or data[0][0:3] == "18.":
                    it_z = it_z + N_segments
-                   print(data)
+                   if print_elements: print(data)
                elif data[0][0:2] == "3." or data[0][0:2] == "2.":
                    it_z = it_z + 1
-                   print(data)
+                   if print_elements: print(data)
                elif data[0][0:5] == '(slit':
                    it_z = it_z + N_segments - 1 
-                   print(data)
+                   if print_elements: print(data)
                    
            line = fp.readline()
            cnt += 1
            
-    print('----')
+    if print_elements: print('----')
     return it_z+1
 
 

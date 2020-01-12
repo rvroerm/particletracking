@@ -9,16 +9,33 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from fits import funcGaussian, errorFuncGaussian, funcDoubleGaussian, errorFuncDoubleGaussian
 from scipy.optimize import leastsq
-from transfer_functions import PtoE, Brho_scaling, split_transport_file, gaussian
+from transfer_functions import PtoE, Brho_scaling, split_transport_file, gaussian, transport_count_lines, GTR_layout_from_transport
 
 
+plt.close('all')
 
+np.set_printoptions(precision=3)
 
-def plot_beam(beam,it_z,it_z_GTR,ref_p):
+def plot_beam(input_file,beam,it_z_ISO,it_z_GTR,ref_p):
     
     refE = PtoE(ref_p)
+    
+    #######################################
+    # compute GTR drawing
+    nb_pts_z = transport_count_lines(input_file,1) 
+    layout = np.zeros(shape=[nb_pts_z,2]) 
+    layout = GTR_layout_from_transport(input_file,layout,refE)
+    plt.figure('Gantry layout',figsize=(6, 4))
+    plt.scatter(layout[0:nb_pts_z-1,0],layout[0:nb_pts_z-1,1])
+    plt.title('Gantry layout')
+    plt.xlabel('length [m]')
+    plt.ylabel('heigth [m]')
+    
+    
+    #######################################
+    # Particle traces
         
-    fig = plt.figure('Particle traces',figsize=(10, 10))
+    fig = plt.figure('Particle traces',figsize=(9, 6))
 
     fig.suptitle('Particle traces',fontweight="bold")
     
@@ -26,19 +43,19 @@ def plot_beam(beam,it_z,it_z_GTR,ref_p):
     ax1 = fig.add_subplot(212) # add subplot 2 
     
     
-    ax0.plot(beam[0:it_z,0,:],beam[0:it_z,1,:]) # plot X on left plot
+    ax0.plot(beam[0:it_z_ISO,0,:],beam[0:it_z_ISO,1,:]) # plot X on left plot
     plt.ylim((-0.05,0.05))
     ax0.set_xlabel('z [m]')
     ax0.set_ylabel('x [m]')
-    #plt.legend(np.vectorize(PtoE)(ref_p*(1+beam[it_z,6,:])))
+    #plt.legend(np.vectorize(PtoE)(ref_p*(1+beam[it_z_ISO,6,:])))
     ax0.grid(which='major')
     
-    ax1.plot(beam[0:it_z,0,:],beam[0:it_z,3,:]) # plot Y on right plot
+    ax1.plot(beam[0:it_z_ISO,0,:],beam[0:it_z_ISO,3,:]) # plot Y on right plot
     plt.ylim((-0.05,0.05))
     ax1.set_xlabel('z [m]')
     ax1.set_ylabel('y [m]')
     ax1.grid(which='major')
-    #plt.legend(np.vectorize(PtoE)(ref_p*(1+beam[it_z,6,:])))
+    #plt.legend(np.vectorize(PtoE)(ref_p*(1+beam[it_z_ISO,6,:])))
     
     
     
@@ -50,8 +67,8 @@ def plot_beam(beam,it_z,it_z_GTR,ref_p):
     plt.title('Spot size at isocenter')
     
     # filter NaN values
-    X_iso_filtered = beam[it_z,1,:][~np.isnan(beam[it_z,1,:])]
-    Y_iso_filtered = beam[it_z,3,:][~np.isnan(beam[it_z,3,:])]
+    X_iso_filtered = beam[it_z_ISO,1,:][~np.isnan(beam[it_z_ISO,1,:])]
+    Y_iso_filtered = beam[it_z_ISO,3,:][~np.isnan(beam[it_z_ISO,3,:])]
     
     ## add filter on central values for the fit
     #maskX = np.logical_and(X_iso_filtered < 0.01,X_iso_filtered>-0.01)
@@ -78,8 +95,11 @@ def plot_beam(beam,it_z,it_z_GTR,ref_p):
     param_initial=[100,0,0.003]
     param_final,success = leastsq(errorFuncGaussian,param_initial[:],args=(X_spot[:][0],X_spot[:][1]))
     (muX,sigmaX) = param_final[1:3]
-    print('mu X = ',muX,' , sigma X = ',sigmaX)
+    print('mu X = %0.2e mm, sigma X = %0.2e mm'%(muX*1000,sigmaX*1000))
+    
+    
     plt.plot(X_spot[:][0],funcGaussian(param_final,X_spot[:][0]),'b--',label='X fit: \u03BC = {:.2f} mm, \u03C3 = {:.2f} mm'.format(muX*1000,sigmaX*1000))
+    
     
     # double Gaussian fit
     param_initial=[100,0,0.003,10,0,0.01]
@@ -100,7 +120,8 @@ def plot_beam(beam,it_z,it_z_GTR,ref_p):
     param_initial=[100,0,0.003]
     param_final,success = leastsq(errorFuncGaussian,param_initial[:],args=(Y_spot[:][0],Y_spot[:][1]))
     (muY,sigmaY) = param_final[1:3]
-    print('mu Y = ',muY,' , sigma Y = ',sigmaY)
+    
+    print('mu Y = %0.2e mm, sigma Y = %0.2e mm'%(muY*1000,sigmaY*1000))
     plt.plot(Y_spot[:][0],funcGaussian(param_final,Y_spot[:][0]),'r--',label='Y fit: \u03BC = {:.2f} mm, \u03C3 = {:.2f} mm'.format(muY*1000,sigmaY*1000))
     
     
@@ -120,7 +141,7 @@ def plot_beam(beam,it_z,it_z_GTR,ref_p):
     
     
     plt.figure('Spot size vs enrgy')
-    plt.scatter(beam[it_z,1,:],beam[it_z,3,:], c = np.vectorize(PtoE)(ref_p*(1+beam[0,6,:])))
+    plt.scatter(beam[it_z_ISO,1,:],beam[it_z_ISO,3,:], c = np.vectorize(PtoE)(ref_p*(1+beam[0,6,:])))
     plt.xlabel('x [m]')
     plt.ylabel('y [m]')
     plt.colorbar()
@@ -133,7 +154,7 @@ def plot_beam(beam,it_z,it_z_GTR,ref_p):
     plt.figure('Energy transmission')
     plt.hist(np.vectorize(PtoE)(ref_p*(1+beam[0,6,:])),100,range=(refE-10,refE+10),alpha=0.3,label="E source")
     plt.hist(np.vectorize(PtoE)(ref_p*(1+beam[it_z_GTR,6,:])),100,range=(refE-10,refE+10),alpha=0.3,label="E_in GTR")
-    plt.hist(np.vectorize(PtoE)(ref_p*(1+beam[it_z,6,:])),100,range=(refE-10,refE+10),alpha=0.3,label="E_out GTR")
+    plt.hist(np.vectorize(PtoE)(ref_p*(1+beam[it_z_ISO,6,:])),100,range=(refE-10,refE+10),alpha=0.3,label="E_out GTR")
     plt.title('Energy transmission')
     plt.legend(loc='upper right')
     plt.xlabel('E [MeV]')
@@ -143,21 +164,21 @@ def plot_beam(beam,it_z,it_z_GTR,ref_p):
     
     ################################################
     
-    fig = plt.figure('Emittance',figsize=(18, 8))
+    fig = plt.figure('Emittance',figsize=(9, 6))
     
     
     ax0 = fig.add_subplot(121) # add subplot 1 (121 = 1 row, 2 columns, first plot)
     ax1 = fig.add_subplot(122) # add subplot 2 
     
     
-    ax0.scatter(beam[it_z,1,:],beam[it_z,2,:], c = np.vectorize(PtoE)(ref_p*(1+beam[0,6,:])))
+    ax0.scatter(beam[it_z_ISO,1,:],beam[it_z_ISO,2,:], c = np.vectorize(PtoE)(ref_p*(1+beam[0,6,:])))
     ax0.set_xlabel('x [m]')
     ax0.set_ylabel('divx [mrad]')
     
     
     
     
-    im1 = ax1.scatter(beam[it_z,3,:],beam[it_z,4,:], c = np.vectorize(PtoE)(ref_p*(1+beam[0,6,:])))
+    im1 = ax1.scatter(beam[it_z_ISO,3,:],beam[it_z_ISO,4,:], c = np.vectorize(PtoE)(ref_p*(1+beam[0,6,:])))
     ax1.set_xlabel('y [m]')
     ax1.set_ylabel('divy [mrad]')
     

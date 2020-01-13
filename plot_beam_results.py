@@ -10,6 +10,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from fits import funcGaussian, errorFuncGaussian, funcDoubleGaussian, errorFuncDoubleGaussian
 from scipy.optimize import leastsq
 from transfer_functions import PtoE, Brho_scaling, split_transport_file, gaussian, transport_count_lines, GTR_layout_from_transport
+from scipy.stats import norm
 
 
 plt.close('all')
@@ -17,6 +18,13 @@ plt.close('all')
 np.set_printoptions(precision=3)
 
 def plot_beam(input_file,beam,it_z_ISO,it_z_GTR,ref_p):
+    """
+    Plot beam properties
+    
+    Retun spot size parameters at isocenter
+    
+    """
+    
     
     refE = PtoE(ref_p)
     
@@ -65,6 +73,9 @@ def plot_beam(input_file,beam,it_z_ISO,it_z_GTR,ref_p):
     plt.figure('Spot size')
     
     plt.title('Spot size at isocenter')
+    
+    
+    
     
     # filter NaN values
     X_iso_filtered = beam[it_z_ISO,1,:][~np.isnan(beam[it_z_ISO,1,:])]
@@ -187,3 +198,24 @@ def plot_beam(input_file,beam,it_z_ISO,it_z_GTR,ref_p):
     fig.colorbar(im1, cax=cax, orientation='vertical')
     
     plt.subplots_adjust(wspace=0.4) # put more space between plts
+    
+    return [sigmaX, sigmaY]
+
+
+def get_spot_size(it_z,beam):
+    """
+    Get beam spot size at index it_z
+
+    """
+    
+    
+    X_iso_filtered = beam[it_z,1,:][~np.isnan(beam[it_z,1,:])]
+    Y_iso_filtered = beam[it_z,3,:][~np.isnan(beam[it_z,3,:])]
+    
+    # fit
+    (muX, sigmaX) = norm.fit(X_iso_filtered)
+    (muY, sigmaY) = norm.fit(Y_iso_filtered)
+    
+    
+    return [sigmaX, sigmaY]
+    

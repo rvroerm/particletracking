@@ -10,6 +10,8 @@ import math as math
 import numpy as np
 from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt
 from scipy.optimize import curve_fit
+
+import warnings
 #import matplotlib.pyplot as plt
 
 
@@ -54,12 +56,18 @@ def split_transport_file(transport_file):
     saves the output files in the current folder
     """
     
+    initial_beam_found = False
+    gantry_found = False
+    ISO_found = False
+    
     with open(transport_file) as infile, open('transport_file_ESS.txt', 'w') as outfile:
         copy = False
         for line in infile:
-            if line.strip() == "/* Initial beam*/":
+            if line.strip().replace(" ","") == "/*Initialbeam*/":
+                initial_beam_found = True
                 copy = True
-            elif line.strip() == "/* Gantry */":
+            elif line.strip().replace(" ","") == "/*Gantry*/":
+                gantry_found = True
                 copy = False
             elif copy:
                 outfile.write(line)
@@ -69,13 +77,22 @@ def split_transport_file(transport_file):
     with open(transport_file) as infile, open('transport_file_GTR.txt', 'w') as outfile:
         copy = False
         for line in infile:
-            if line.strip() == "/* Gantry */":
+            if line.strip().replace(" ","") == "/*Gantry*/":
                 copy = True
-            elif line.strip() == "/* ISO */":
+            elif line.strip().replace(" ","") == "/*ISO*/":
+                ISO_found = True
                 copy = False
             elif copy:
                 outfile.write(line)
-            
+     
+    
+    if not initial_beam_found:
+        warnings.warn(" /*Initialbeam*/ label not defined in Transport file, plots might not correspond to the desired location")            
+    if not gantry_found:
+        warnings.warn(" /*Gantry*/ label not defined in Transport file, plots might not correspond to the desired location")
+    if not ISO_found:
+        warnings.warn(" /*ISO*/ label not defined in Transport file, plots might not correspond to the desired location")
+        
     outfile.close()
 
 def GTR_layout_from_transport(transport_file,coord,refE):

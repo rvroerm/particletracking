@@ -122,7 +122,7 @@ class Particle:
         if particle_type=='proton' : self.rest_mass = 938
         else: raise Exception("Particle type is not known")
         
-        if ~refp> 0:
+        if refp <= 0:
             raise Exception("Reference energy is not a positive number")
         
         
@@ -198,12 +198,10 @@ class Particle:
             # add pole face calculations if non zero
             if ~np.isnan(pole_face1) :
                 angle_mat1 = pole_face_mat(pole_face1, B, gap, self.get_p(), k1, k2)
-                print(angle_mat1)
                 dipole_mat = angle_mat1 * dipole_mat
             if ~np.isnan(pole_face2) :
                 angle_mat2 = pole_face_mat(pole_face2, B, gap, self.get_p(), k1, k2)
                 dipole_mat = dipole_mat * angle_mat2
-                print(angle_mat2)
                 
             # calculate new particle properties and put them in a new raw
             new_row = pd.DataFrame(data = [np.matmul(dipole_mat, self.get_vect())], \
@@ -251,27 +249,84 @@ class Particle:
 
 class Beam:
     
-    def __init__(self):
-        self.X = []
-        self.Y = []
-        self.divX = []
-        self.divY = []
-        self.E = []
+    def __init__(self, nb_part=1000, \
+                       refE = 160, DeltaE=0, E_dist='cst',  \
+                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+                       DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform', \
+                       particle_type='proton'):
+        
+        # initialize empty dataframe
+        self.beam_df = pd.DataFrame(columns = ['Particle objects']) 
+        
+        for i in range(0,nb_part):
+            # initialize particle properties
+            if size_dist =='uniform':
+                sizeX = DeltaX*np.random.uniform(-1,1)
+                sizeY = DeltaY*np.random.uniform(-1,1)
+            elif size_dist == 'normal':
+                sizeX = DeltaX*np.random.normal(0,1)
+                sizeY = DeltaY*np.random.normal(0,1)
+            elif size_dist == 'cst':
+                sizeX = DeltaX*(i-nb_part/2)/nb_part*2
+                sizeY = DeltaY*(i-nb_part/2)/nb_part*2
+            else:
+                raise Exception('Distribution chosen for "size_dist" is not valid')
+            
+            
+            if div_dist =='uniform' :
+                divX = DeltaDivX*np.random.uniform(-1,1)
+                divY = DeltaDivY*np.random.uniform(-1,1)
+            elif div_dist == 'normal':
+                divX = DeltaDivX*np.random.normal(0,1)
+                divY = DeltaDivY*np.random.normal(0,1)
+            elif div_dist == 'cst':
+                divX = DeltaDivX*(i-nb_part/2)/nb_part*2
+                divY = DeltaDivY*(i-nb_part/2)/nb_part*2
+            else:
+                raise Exception('Distribution chosen for "div_dist" is not valid')
+                
+             
+            if E_dist == 'uniform' :
+                E = refE + DeltaE*np.random.uniform(-1,1)
+            elif E_dist == 'normal':
+                E = refE + DeltaE*np.random.normal(0,1)
+            elif E_dist == 'cst':
+                E = refE + DeltaE*(i-nb_part/2)/nb_part*2
+            else:
+                raise Exception('Distribution chosen for "E_dist" is not valid')
+                
+            
+            # create new particle
+            new_particle = Particle(z=0, x=sizeX , y=sizeY, divX=divX, divY=divY, \
+                                    dL=0, p=EtoP(E), refp=EtoP(refE), particle_type=particle_type)
+            
+            # put new particle in beam
+            self.beam_df = \
+            self.beam_df.append(pd.DataFrame(data = [new_particle], columns = self.beam_df.columns), \
+                            ignore_index=True)                                                                                        
+        
+    
+    
         
     def add_particle(self, particle : Particle()):
-        self.X = self.X.append(particle.x)
-        self.Y = self.Y.append(particle.y)
-        self.divX = self.divX.append(particle.divX)
-        self.divY = self.divY.append(particle.divY)
-        self.E = self.E.append(particle.E)
+        self.beam_df = self.beam_df.append(pd.DataFrame(data = particle, columns = self.beam_df.columns), \
+                            ignore_index=True)
         
-    def size_X(self):
-        (muX, sigmaX) = norm.fit(self.X[~np.isnan(self.X)])
+    def get_beam_X(self, row_nb=-1):
+        """ get the X coordinates of all the particles in the beam in a given row"""
+        
+        X = [] # list of particle positions in X
+        for particle in self.beam_df['Particle objects'].values :
+            X.append(particle.get_x(row_nb))
+        
+        return np.asarray(X) # convert to numpy
+    
+    
+    def size_X(self, row_nb=-1):
+        X = self.get_beam_X(row_nb)
+        (muX, sigmaX) = norm.fit(X[~np.isnan(X)])
         return sigmaX
     
-    def size_Y(self):
-        (muY, sigmaY) = norm.fit(self.Y[~np.isnan(self.Y)])
-        return sigmaY
     
 
 

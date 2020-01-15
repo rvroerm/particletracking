@@ -369,8 +369,10 @@ def drift_core(L,beam,refE):
     
     return beam
 
-
-
+def drift_matrix(L,p,rest_mass=938):
+    gamma = PtoGamma(p,938)
+    drift_mat = np.array([[1,L,0,0,0,0],[0,1,0,0,0,0],[0,0,1,L,0,0],[0,0,0,1,0,0],[0,0,0,0,1,L/gamma**2],[0,0,0,0,0,1]])
+    return drift_mat    
 
 def RF_cavity(delta_E,cav_length,freq,phi,beam,refE,it_z,N_segments = 10):
     # simplified version, neglects defocusing effects
@@ -730,9 +732,7 @@ def pole_face(angle,B,gap,k1,k2,beam,refE,it_z,paraxial_correction = False):
     
     ref_p = EtoP(refE)
     p = ref_p + beam[it_z,6]*ref_p
-    E = PtoE(p)
-    
-    Brho  = 1/300*sqrt(E**2+2*938*E)
+    Brho  = PtoBrho(p)
     
     if paraxial_correction :
         corr_fact = sqrt(beam[it_z,2]**2+beam[it_z,4]**2+1)
@@ -767,7 +767,30 @@ def pole_face(angle,B,gap,k1,k2,beam,refE,it_z,paraxial_correction = False):
     return [beam, it_z]
 
 
-
+def pole_face_mat(angle,B,gap,p,k1=0.5,k2=0,paraxial_correction = False):
+    """
+    k1 and k2 related to frindge field properties; default k1=0.5, k2=0
+    see SLAC transport manual
+    """
+    
+    Brho  = PtoBrho(p)
+    
+    radius = Brho/B
+    
+    beta = math.radians(angle)
+    
+    
+    psi = k1*(gap/radius)*((1+sin(beta)**2)/cos(beta))*(1-k1*k2*gap/radius*tan(beta))    
+    
+    
+    pole_mat = np.array([[1,0,0,0,0,0],
+                    [tan(beta)/radius,1,0,0,0,0],
+                    [0,0,1,0,0,0],
+                    [0,0,-tan(beta-psi)/radius,1,0,0],
+                    [0,0,0,0,1,0],
+                    [0,0,0,0,0,1]])
+    
+    return pole_mat
 
 def bending(L,B,n,pole_in,pole_out,gap,k1,k2,beam,refE,it_z,N_segments = 10,kill_lost_particles=True,gap_X=1,paraxial_correction = False, dpz_tolerance=10**-6):
     """

@@ -320,8 +320,8 @@ def transport_input(transport_file,beam,refE,it_p,N_segments,gap,k1,k2,z,it_z,sc
                    
                    [beam[:,:,it_p],it_z] = slitX(L,leftX,rightX,mat,beam[:,:,it_p],it_z,refE,N_segments)
                    
-                   line = fp.readline()
-                   cnt +=1 # skip next drift
+                   line = fp.readline() # skip next drift
+                   cnt +=1 
                    
                    
            prev_line = line     

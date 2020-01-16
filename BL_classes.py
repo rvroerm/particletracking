@@ -7,7 +7,7 @@ Created on Mon Jan 13 15:40:04 2020
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat
+from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat, Highland
 from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt
 import warnings
 
@@ -143,21 +143,22 @@ class Particle:
     
     
     def get_z(self, row_nb=-1): return self.z_df[['z [m]']].iloc[row_nb,0]
+    
     def get_x(self, row_nb=-1): return self.p_df[['x [m]']].iloc[row_nb,0]
+    def get_y(self, row_nb=-1): return self.p_df[['y [m]']].iloc[row_nb,0]
+    def get_divx(self, row_nb=-1): return self.p_df[['div x [rad]']].iloc[row_nb,0]
+    def get_divy(self, row_nb=-1): return self.p_df[['div y [rad]']].iloc[row_nb,0]
+    def get_dL(self, row_nb=-1): return self.p_df[['dL [m]']].iloc[row_nb,0]
     def get_dponp(self, row_nb=-1): return self.p_df[['dp/p']].iloc[row_nb,0]
-    
-    def plot_x(self): # example, to put in separate function later
-        plt.plot(self.z_df, self.p_df[['x [m]']])
-    
     def get_vect(self, row_nb=-1): 
         # get beam properties at row=row_nb, default=last row
         return self.p_df[['x [m]','div x [rad]','y [m]','div y [rad]','dL [m]','dp/p']].iloc[row_nb].to_numpy()
     
     def get_p(self, row_nb=-1): return self.get_dponp(row_nb)*self.refp + self.refp
-    
     def get_E(self, row_nb=-1): return PtoE(self.get_p(row_nb))
     
-    
+    def plot_x(self): # example, to put in separate function later
+        plt.plot(self.z_df, self.p_df[['x [m]']])
         
     
     def particle_through_BLelement(self, element : BL_Element):
@@ -169,17 +170,8 @@ class Particle:
             return
         
         
-        if element.element_type == "drift" :
-            L = element.length
-            drift_mat = drift_matrix(L, self.get_p(), rest_mass=self.rest_mass)
-            
-            # calculate new particle properties and put them in a new raw
-            new_row = pd.DataFrame(data = [np.matmul(drift_mat, self.get_vect())], \
-                                     columns = self.p_df.columns)
-            self.p_df = self.p_df.append(new_row, ignore_index=True)
-            
-            # update z
-            self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z() + L], columns = ['z [m]']), ignore_index=True)
+        if element.element_type == "drift" :            
+            particle_through_drift(self, element)
             
         elif element.element_type == "dipole" :
             B = element.Bfield
@@ -232,19 +224,25 @@ class Particle:
             
             # update z
             self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z() + L], columns = ['z [m]']), ignore_index=True)
+        
+        elif element.element_type == "slit" :
+            particle_through_slit(self, element)
         else:
             warnings.warn("Element transfer function not defined: ",element.element_type) 
             
-            
+        return    
             
     def particle_through_BL(self, BL : Beamline()):
         
         for index, row in BL.BL_df.iterrows(): # loop all elements into BL
             self.particle_through_BLelement(row['BL object'])
-            
+        
 
 
-    
+
+
+
+
 
 
 class Beam:
@@ -428,17 +426,87 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1):
                    new_element.quadrupole(B=B, a=a)
                    my_beamline.add_element(new_element)
                    
+               if data[0][0:5] == '(slit':
+                   # slit
                    
+                   L = float(data[1].replace(";","") )
+                   leftX = float(data[2].replace(";","") )
+                   rightX = float(data[3].replace(";","") )
+                   mat = data[4].replace(";","") 
+                   
+                   opening = rightX - leftX
+                   offset = rightX + leftX
+                   
+                   new_element = BL_Element(name = name, length = L)
+                   new_element.slit(opening, orientation='X', mat = mat, offset = offset, nb_pts=20)
+                   my_beamline.add_element(new_element)
+                   
+                   line = fp.readline() # skip next drift
                    
                    
                if data[0][0:3] == "16.":
                   if data[1][0:2] == "5." or data[1][0:1] == '5' :
                        # gap
                        vertical_gap = float(data[2].replace(";","") )/1000
-                       
+                   
+                    
+                    
                        
            prev_line = line     
            line = fp.readline()
            
            
        return my_beamline
+
+
+
+def particle_through_drift(particle: Particle, drift : BL_Element):
+    L = drift.length
+    drift_mat = drift_matrix(L, particle.get_p(), rest_mass=particle.rest_mass)
+    
+    # calculate new particle properties and put them in a new raw
+    new_row = pd.DataFrame(data = [np.matmul(drift_mat, particle.get_vect())], \
+                             columns = particle.p_df.columns)
+    particle.p_df = particle.p_df.append(new_row, ignore_index=True)
+    
+    # update z
+    particle.z_df = particle.z_df.append(pd.DataFrame(data = [particle.get_z() + L], columns = ['z [m]']), ignore_index=True)
+    
+    return particle
+    
+
+def particle_through_slit(particle: Particle, slit : BL_Element):
+    """
+    slit with 2 blades (left and right)
+    """
+    
+    L_segment = slit.length/slit.N_segments
+    left_blade = -slit.gap/2 + slit.offset
+    right_blade = slit.gap/2 + slit.offset
+    
+    for i in range(0, slit.N_segments):
+        if slit.orientation == 'X':
+            pos = particle.get_x()
+        elif slit.orientation == 'Y':
+            pos = particle.get_y()
+        
+        if (pos <= left_blade or pos >= right_blade): # particle hits the slit
+                
+            [new_vect, sigma] = Highland(L_segment, slit.material, particle.get_vect(), PtoE(particle.refp))
+            
+            
+            new_row = pd.DataFrame(data = [new_vect], columns = particle.p_df.columns)
+            particle.p_df = particle.p_df.append(new_row, ignore_index=True)
+            
+            # update z
+            particle.z_df = particle.z_df.append(\
+                                                 pd.DataFrame(data = [particle.get_z() + L_segment], \
+                                                 columns = ['z [m]']), ignore_index=True)
+            
+        else: # particle passes through --> drift
+            particle_through_drift(particle, BL_Element(L_segment))
+    
+    
+                
+    
+    return particle

@@ -33,4 +33,4 @@ run_from_transport(input_file = input_file, nb_part=nb_part, \
                        refE = refE, old_refE = old_refE, DeltaE=DeltaE, E_dist=E_dist,  \
                        DeltaDivX = DeltaDivX, DeltaDivY = DeltaDivY, div_dist=div_dist, \
                        gap = gap, paraxial_correction = False, \
-                       plot_results = False, output_results=True)
+                       plot_results = True, output_results=True)

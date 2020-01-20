@@ -95,77 +95,6 @@ def split_transport_file(transport_file):
         
     outfile.close()
 
-def GTR_layout_from_transport(transport_file,coord,refE):
-    
-    
-    angle = 0
-    rot_mat = [[1,0],[0,1]]
-    new_vect = [0,0]
-    
-    
-    coord[0,:] = [0,0]
-    it_z = 1
-    
-    Brho = 1/300*sqrt(refE**2+2*938*refE)
-    
-    filepath = transport_file
-    with open(filepath) as fp:  
-       line = fp.readline()
-       cnt = 1
-       
-       while line:
-           #print("Line {}: {}".format(cnt, line.strip()))
-           
-           data = line.split() 
-           
-           if data: # string is not empty
-               
-               if data[0][0:2] == "3.":
-                   # drift
-                   L = float(data[1].replace(";","") )
-                   
-                   coord[it_z,:] = coord[it_z-1,:] + np.matmul(rot_mat,[L,0])
-                   
-                   it_z = it_z + 1
-                   
-               if data[0][0:2] == "4.":
-                   # sector bending
-                   
-                   L = float(data[1].replace(";","") )
-                   B = float(data[2].replace(";","") )
-                   rho = Brho/B
-                   B_angle = L/rho
-                   
-#                   
-#                   print('--')
-#                   print('angle = ',angle)
-#                   print('B_angle = ',B_angle)
-#                   print(rot_mat)
-#                   print([rho*sin(B_angle),rho*(1-cos(B_angle))])
-#                   
-                   coord[it_z,:] = coord[it_z-1,:] + np.matmul(rot_mat,[rho*sin(B_angle),rho*(1-cos(B_angle))])
-                   
-                   angle = angle + B_angle
-                   
-                   
-                   rot_mat = [[cos(angle),-sin(angle)],[sin(angle),cos(angle)]]
-                   it_z = it_z + 1
-                   
-               if data[0][0:2] == "5.": 
-                   # quad
-                   L = float(data[1].replace(";","") )
-                   new_vect[0] = L
-                   new_vect[1] = 0
-                   coord[it_z,:] = coord[it_z-1,:] + np.matmul(rot_mat,new_vect)
-                   it_z = it_z + 1
-                   
-                   
-           line = fp.readline()
-           cnt += 1
-       
-
-
-    return coord  
 
 
 def Brho_scale_transport(transport_file,newE,new_file_path="D:/temp/",rest_mass=938):
@@ -1172,16 +1101,16 @@ def RtoE(R):
     return E    
 
 def EtoBrho(E,rest_mass=938):
-    Brho  = 1/299.8*sqrt(E**2+2*rest_mass*E)
+    Brho  = 1/rest_mass*sqrt(E**2+2*rest_mass*E)
     return Brho
 
 def PtoBrho(p,rest_mass=938):
-    Brho  = 1/299.8*p
+    Brho  = 1/rest_mass*p
     return Brho
 
 def Brho_scaling(refE,newE,rest_mass=938):
-    refBrho = 1/299.8*sqrt(refE**2+2*rest_mass*refE)
-    newBrho = 1/299.8*sqrt(newE**2+2*rest_mass*newE)
+    refBrho = 1/rest_mass*sqrt(refE**2+2*rest_mass*refE)
+    newBrho = 1/rest_mass*sqrt(newE**2+2*rest_mass*newE)
     
     return newBrho/refBrho
     

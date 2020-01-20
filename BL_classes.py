@@ -4,15 +4,18 @@ Created on Mon Jan 13 15:40:04 2020
 
 @author: rvroerm
 """
+
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
 from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat, Highland
-from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt
+from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, pi
 import warnings
 
 import matplotlib.pyplot as plt
-
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
     
 class BL_Element:
     """
@@ -24,19 +27,24 @@ class BL_Element:
         self.length = length
         self.element_type = "drift" # default is a drift
         self.N_segments = 1
+        self.curvature = 0 # curvature of the element (cf. dipole case)
+        self.CCT_angle = pi/6 # angle of the windings in the CCT case
         
         
-        
-    def dipole(self, B, n, gap, pole_face1=0, pole_face2=0, k1 = 0.5, k2 = 0, nb_pts=10):
+    def dipole(self, B, n, aperture, pole_face1=0, pole_face2=0, k1 = 0.5, k2 = 0, nb_pts=10):
         self.element_type = "dipole"
         self.Bfield = B
         self.order = n
-        self.gap = gap
+        self.aperture = aperture
         self.k1 = k1
         self.k2 = k2
-        self.angle1 = pole_face1
-        self.angle2 = pole_face2
+        self.pole_face1 = pole_face1
+        self.pole_face2 = pole_face2
         self.N_segments = nb_pts
+        
+    def set_dipole_curvature(self, p, rest_mass):
+        """ set dipole curvature based on particle properties to the magnet field """
+        self.curvature =  self.Bfield * p * rest_mass
         
     def quadrupole(self, B, a, nb_pts=10):
         self.element_type = "quad"
@@ -64,7 +72,62 @@ class BL_Element:
         self.offset = offset
         self.N_segments = nb_pts
         
+
+def magnet_plot(element: BL_Element(), coil_height=0.1, start_point = np.array([0,0])):
+    """ Plot magnet """
+    
+    x0 = start_point[0]
+    y0 = start_point[1]
+    
+    a = element.aperture
+    h = coil_height
+    L = element.length
+    CCT_angle = element.CCT_angle
+    
+    upper_points = [[x0, y0 + a] , [x0 + L, y0 + a] , [x0 + L + tan(CCT_angle)*a, y0 + a + h], [x0 - tan(CCT_angle)*a, y0 + a + h] ]
+    lower_points = [[x0, y0 - a] , [x0 + L, y0 - a] , [x0 + L + tan(CCT_angle)*a, y0 - a - h], [x0 - tan(CCT_angle)*a, y0 - a - h] ]
+    
+    
+    
+    patches = []
+    
+    polygon1 = Polygon(np.array(upper_points), closed = True)
+    patches.append(polygon1)
+    
+    polygon2 = Polygon(np.array(lower_points), closed = True)
+    patches.append(polygon2)
+    
+    
+    
+    
+    return patches
         
+def BL_plot(BL : Beamline):
+    
+    start_point = np.array([0,0])
+    
+    element_list = BL.BL_df['BL object'].values
+    
+    fig, ax = plt.subplots()
+    
+    
+    for element in element_list:
+        
+        if element.element_type == 'dipole' :
+            patches = magnet_plot(element, start_point=start_point)
+            p = PatchCollection(patches, color='blue')
+            ax.add_collection(p)
+        elif element.element_type == 'quad' :
+            patches = magnet_plot(element, start_point=start_point)
+            p = PatchCollection(patches, color='red')
+            ax.add_collection(p)    
+        
+            
+        start_point = start_point + [element.length , 0]
+        
+    plt.xlim([-0.1, start_point[0]])
+    plt.ylim([-0.2,0.2])
+    plt.show()
 
 class Beamline:
     
@@ -92,12 +155,12 @@ class Beamline:
             if i!=0:
                 # not first sub-element
                 if element.element_type == 'dipole':
-                    slice_element.angle1 = np.nan
+                    slice_element.pole_face1 = np.nan
             
             if i != element.N_segments-1:
                 # not last sub-element
                 if element.element_type == 'dipole':
-                    slice_element.angle2 = np.nan
+                    slice_element.pole_face2 = np.nan
             
             
             new_row = pd.DataFrame(data = [[self.get_z() + slice_element.length, \
@@ -179,9 +242,9 @@ class Particle:
             n = element.order
             k1 = element.k1
             k2 = element.k2
-            gap = element.gap
-            pole_face1 = element.angle1
-            pole_face2 = element.angle2
+            aperture = element.aperture
+            pole_face1 = element.pole_face1
+            pole_face2 = element.pole_face2
             
             
             dipole_mat = sec_bend_matrix(L,B,n, self.get_p(), rest_mass=self.rest_mass)
@@ -189,10 +252,10 @@ class Particle:
             
             # add pole face calculations if non zero
             if ~np.isnan(pole_face1) :
-                angle_mat1 = pole_face_mat(pole_face1, B, gap, self.get_p(), k1, k2)
+                angle_mat1 = pole_face_mat(pole_face1, B, aperture, self.get_p(), k1, k2)
                 dipole_mat = angle_mat1 * dipole_mat
             if ~np.isnan(pole_face2) :
-                angle_mat2 = pole_face_mat(pole_face2, B, gap, self.get_p(), k1, k2)
+                angle_mat2 = pole_face_mat(pole_face2, B, aperture, self.get_p(), k1, k2)
                 dipole_mat = dipole_mat * angle_mat2
                 
             # calculate new particle properties and put them in a new raw
@@ -336,7 +399,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1):
     # default settings
     my_beamline = Beamline()
     
-    vertical_gap = 0.03 # default value
+    vertical_aperture = 0.03 # default value
     
     filepath = transport_file
     with open(filepath) as fp:  
@@ -374,7 +437,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1):
                    my_beamline.add_element(new_element)
                
                     
-               if data[0][0:2] == "4.":
+               elif data[0][0:2] == "4.":
                    # sector bending
                    L = float(data[1].replace(";","") )
                    B = float(data[2].replace(";","") )*scaling_ratio
@@ -396,19 +459,23 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1):
                            angle_in = float(data_prev[1].replace(";","") )
                            
                    last_pos = fp.tell() # save line position
+                   
                    line = fp.readline()
-                   if data_prev[0] == "2.": # exit pole face
-                       angle_out = float(data_prev[1].replace(";","") )
-                   else:
-                       fp.seek(last_pos) # go back, exit face not defined
+                   data = line.split() 
+                   
+                   if data: # string is not empty
+                       if data_prev[0] == "2.": # exit pole face
+                           angle_out = float(data_prev[1].replace(";","") )
+                       else:
+                           fp.seek(last_pos) # go back, exit face not defined
                        
                   
                    
                    new_element = BL_Element(name = name, length = L)
-                   new_element.dipole(B=B, n=n, gap=vertical_gap, pole_face1=angle_in, pole_face2=angle_out)
+                   new_element.dipole(B=B, n=n, aperture=vertical_aperture, pole_face1=angle_in, pole_face2=angle_out)
                    my_beamline.add_element(new_element)
                 
-               if data[0][0:2] == "5.":
+               elif data[0][0:2] == "5.":
                    # quad
                    L = float(data[1].replace(";","") )
                    B = float(data[2].replace(";","") ) * scaling_ratio
@@ -426,7 +493,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1):
                    new_element.quadrupole(B=B, a=a)
                    my_beamline.add_element(new_element)
                    
-               if data[0][0:5] == '(slit':
+               elif data[0][0:5] == '(slit':
                    # slit
                    
                    L = float(data[1].replace(";","") )
@@ -444,10 +511,10 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1):
                    line = fp.readline() # skip next drift
                    
                    
-               if data[0][0:3] == "16.":
+               elif data[0][0:3] == "16.":
                   if data[1][0:2] == "5." or data[1][0:1] == '5' :
-                       # gap
-                       vertical_gap = float(data[2].replace(";","") )/1000
+                       # aperture
+                       vertical_aperture = float(data[2].replace(";","") )/1000
                    
                     
                     

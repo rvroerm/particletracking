@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from fits import funcGaussian, errorFuncGaussian, funcDoubleGaussian, errorFuncDoubleGaussian
 from scipy.optimize import leastsq
-from transfer_functions import PtoE, Brho_scaling, split_transport_file, gaussian, transport_count_lines, GTR_layout_from_transport
+from transfer_functions import PtoE, Brho_scaling, split_transport_file, gaussian, transport_count_lines
 from scipy.stats import norm
-
+from BL_geometry import GTR_layout_from_transport
 
 plt.close('all')
 
@@ -31,8 +31,8 @@ def plot_beam(input_file,beam,it_z_ISO,it_z_GTR,ref_p):
     #######################################
     # compute GTR drawing
     nb_pts_z = transport_count_lines(input_file,1) 
-    layout = np.zeros(shape=[nb_pts_z,2]) 
-    layout = GTR_layout_from_transport(input_file,layout,refE)
+    
+    layout = GTR_layout_from_transport(input_file,nb_pts_z,refE)
     plt.figure('Gantry layout',figsize=(6, 4))
     plt.scatter(layout[0:nb_pts_z-1,0],layout[0:nb_pts_z-1,1])
     plt.title('Gantry layout')

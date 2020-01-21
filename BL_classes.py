@@ -28,106 +28,72 @@ class BL_Element:
         self.element_type = "drift" # default is a drift
         self.N_segments = 1
         self.curvature = 0 # curvature of the element (cf. dipole case)
-        self.CCT_angle = pi/6 # angle of the windings in the CCT case
         
         
-    def dipole(self, B, n, aperture, pole_face1=0, pole_face2=0, k1 = 0.5, k2 = 0, nb_pts=10):
+        
+    def dipole(self, B, n, apertureY, apertureX=0, pole_face1=0, pole_face2=0, \
+               curvature=0, CCT_angle = 0, k1 = 0.5, k2 = 0, nb_pts=10):
         self.element_type = "dipole"
         self.Bfield = B
         self.order = n
-        self.aperture = aperture
+        self.apertureY = apertureY
+        if apertureX == 0: self.apertureX = apertureY # unless specified, the aperture is symmetrical
+        else: self.apertureX = apertureX
         self.k1 = k1
         self.k2 = k2
         self.pole_face1 = pole_face1
         self.pole_face2 = pole_face2
         self.N_segments = nb_pts
+        self.curvature = curvature
+        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
         
+    
+    
+    def set_curvature(B, p, rest_mass):
+        """ determine curvature based on particle properties to the magnet field """
+        return B * p * rest_mass
+    
     def set_dipole_curvature(self, p, rest_mass):
         """ set dipole curvature based on particle properties to the magnet field """
-        self.curvature =  self.Bfield * p * rest_mass
+        self.curvature = set_curvature(self.Bfield , p, rest_mass) 
         
-    def quadrupole(self, B, a, nb_pts=10):
+    def quadrupole(self, B, a, CCT_angle = 0, nb_pts=10):
         self.element_type = "quad"
         self.Bfield = B
-        self.aperture = a
+        self.apertureX = a
+        self.apertureY = a
         self.N_segments = nb_pts
+        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
         
-    def sextupole(self, B, a, nb_pts=10):
+    def sextupole(self, B, a, CCT_angle = 0, nb_pts=10):
         self.element_type = "sext"
         self.Bfield = B
-        self.aperture = a
+        self.apertureX = a
+        self.apertureY = a
         self.N_segments = nb_pts
+        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
         
     def solenoid(self, B, a, nb_pts=20):
         self.element_type = "solenoid"
         self.Bfield = B
-        self.aperture = a
+        self.apertureX = a
+        self.apertureY = a
         self.N_segments = nb_pts
         
     def slit(self, gap, orientation='X', mat ='tantalum', offset = 0, nb_pts=20):
         self.element_type = "slit"
-        self.gap = gap
+        
+        if orientation == 'X':
+            self.apertureX = gap
+        elif orientation == 'Y':
+            self.apertureY = gap
+            
         self.orientation = orientation
         self.material = mat
         self.offset = offset
         self.N_segments = nb_pts
         
 
-def magnet_plot(element: BL_Element(), coil_height=0.1, start_point = np.array([0,0])):
-    """ Plot magnet """
-    
-    x0 = start_point[0]
-    y0 = start_point[1]
-    
-    a = element.aperture
-    h = coil_height
-    L = element.length
-    CCT_angle = element.CCT_angle
-    
-    upper_points = [[x0, y0 + a] , [x0 + L, y0 + a] , [x0 + L + tan(CCT_angle)*a, y0 + a + h], [x0 - tan(CCT_angle)*a, y0 + a + h] ]
-    lower_points = [[x0, y0 - a] , [x0 + L, y0 - a] , [x0 + L + tan(CCT_angle)*a, y0 - a - h], [x0 - tan(CCT_angle)*a, y0 - a - h] ]
-    
-    
-    
-    patches = []
-    
-    polygon1 = Polygon(np.array(upper_points), closed = True)
-    patches.append(polygon1)
-    
-    polygon2 = Polygon(np.array(lower_points), closed = True)
-    patches.append(polygon2)
-    
-    
-    
-    
-    return patches
-        
-def BL_plot(BL : Beamline):
-    
-    start_point = np.array([0,0])
-    
-    element_list = BL.BL_df['BL object'].values
-    
-    fig, ax = plt.subplots()
-    
-    
-    for element in element_list:
-        
-        if element.element_type == 'dipole' :
-            patches = magnet_plot(element, start_point=start_point)
-            p = PatchCollection(patches, color='blue')
-            ax.add_collection(p)
-        elif element.element_type == 'quad' :
-            patches = magnet_plot(element, start_point=start_point)
-            p = PatchCollection(patches, color='red')
-            ax.add_collection(p)    
-        
-            
-        start_point = start_point + [element.length , 0]
-        
-    plt.xlim([-0.1, start_point[0]])
-    plt.ylim([-0.2,0.2])
-    plt.show()
 
 class Beamline:
     
@@ -242,7 +208,7 @@ class Particle:
             n = element.order
             k1 = element.k1
             k2 = element.k2
-            aperture = element.aperture
+            apertureY = element.apertureY
             pole_face1 = element.pole_face1
             pole_face2 = element.pole_face2
             
@@ -252,10 +218,10 @@ class Particle:
             
             # add pole face calculations if non zero
             if ~np.isnan(pole_face1) :
-                angle_mat1 = pole_face_mat(pole_face1, B, aperture, self.get_p(), k1, k2)
+                angle_mat1 = pole_face_mat(pole_face1, B, apertureY, self.get_p(), k1, k2)
                 dipole_mat = angle_mat1 * dipole_mat
             if ~np.isnan(pole_face2) :
-                angle_mat2 = pole_face_mat(pole_face2, B, aperture, self.get_p(), k1, k2)
+                angle_mat2 = pole_face_mat(pole_face2, B, apertureY, self.get_p(), k1, k2)
                 dipole_mat = dipole_mat * angle_mat2
                 
             # calculate new particle properties and put them in a new raw
@@ -273,7 +239,7 @@ class Particle:
         
             B = element.Bfield
             L = element.length
-            a = element.aperture
+            a = element.apertureY
             
             
             
@@ -300,12 +266,6 @@ class Particle:
         for index, row in BL.BL_df.iterrows(): # loop all elements into BL
             self.particle_through_BLelement(row['BL object'])
         
-
-
-
-
-
-
 
 
 class Beam:
@@ -391,7 +351,7 @@ class Beam:
     
 
 
-def create_BL_from_Transport(transport_file, scaling_ratio = 1):
+def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
     """
     opens a transport file and creates the corresponding Beamline object
     """
@@ -472,7 +432,9 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1):
                   
                    
                    new_element = BL_Element(name = name, length = L)
-                   new_element.dipole(B=B, n=n, aperture=vertical_aperture, pole_face1=angle_in, pole_face2=angle_out)
+                   new_element.dipole(B=B, n=n, apertureY=vertical_aperture, \
+                                      pole_face1=angle_in, pole_face2=angle_out,\
+                                      CCT_angle = CCT_angle)
                    my_beamline.add_element(new_element)
                 
                elif data[0][0:2] == "5.":
@@ -490,7 +452,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1):
                    else: name = ""
                    
                    new_element = BL_Element(name = name, length = L)
-                   new_element.quadrupole(B=B, a=a)
+                   new_element.quadrupole(B=B, a=a, CCT_angle = CCT_angle)
                    my_beamline.add_element(new_element)
                    
                elif data[0][0:5] == '(slit':
@@ -548,8 +510,13 @@ def particle_through_slit(particle: Particle, slit : BL_Element):
     """
     
     L_segment = slit.length/slit.N_segments
-    left_blade = -slit.gap/2 + slit.offset
-    right_blade = slit.gap/2 + slit.offset
+    
+    if slit.orientation == 'X':
+        left_blade = -slit.apertureX/2 + slit.offset
+        right_blade = slit.apertureX/2 + slit.offset
+    elif slit.orientation == 'Y':
+        left_blade = -slit.apertureY/2 + slit.offset
+        right_blade = slit.apertureY/2 + slit.offset
     
     for i in range(0, slit.N_segments):
         if slit.orientation == 'X':
@@ -574,6 +541,86 @@ def particle_through_slit(particle: Particle, slit : BL_Element):
             particle_through_drift(particle, BL_Element(L_segment))
     
     
-                
     
     return particle
+
+
+
+
+def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start_point = np.array([0,0])):
+    """ 
+    Returns coordinates of element used to plot the magnet
+    Possible orientations for plot: ZX or ZY
+    """
+    
+    x0 = start_point[0]
+    y0 = start_point[1]
+    
+    
+    if orientation == 'ZX':
+        if hasattr(element, 'apertureX'):
+            a = element.apertureX
+        else:
+            return []
+    elif orientation == 'ZY':
+        if hasattr(element, 'apertureY'):
+            a = element.apertureY
+        else:
+            return []
+    
+    
+    
+    if coil_height > 0:
+        h = coil_height
+    else:
+        h = 2 * a # default value for coil representation
+    L = element.length
+    
+    if hasattr(element, 'CCT_angle'):
+        CCT_angle = element.CCT_angle
+    else:
+        CCT_angle = 0
+    
+    upper_points = [[x0, y0 + a] , [x0 + L, y0 + a] , [x0 + L + tan(CCT_angle)*a, y0 + a + h], [x0 - tan(CCT_angle)*a, y0 + a + h] ]
+    lower_points = [[x0, y0 - a] , [x0 + L, y0 - a] , [x0 + L + tan(CCT_angle)*a, y0 - a - h], [x0 - tan(CCT_angle)*a, y0 - a - h] ]
+    
+    patches = []
+    
+    polygon1 = Polygon(np.array(upper_points), closed = True)
+    patches.append(polygon1)
+    
+    polygon2 = Polygon(np.array(lower_points), closed = True)
+    patches.append(polygon2)
+    
+    return patches
+        
+def BL_plot(BL : Beamline, orientation = 'ZX'):
+    """ Possible orientations for plot: ZX or ZY """
+    
+    start_point = np.array([0,0])
+    
+    element_list = BL.BL_df['BL object'].values
+    
+    fig, ax = plt.subplots()
+    
+    for element in element_list:
+        
+        if element.element_type == 'dipole' :
+            patches = magnet_patches(element, start_point=start_point, orientation=orientation)
+            p = PatchCollection(patches, color='blue', alpha=0.6)
+            ax.add_collection(p)
+        elif element.element_type == 'quad' :
+            patches = magnet_patches(element, start_point=start_point, orientation=orientation)
+            p = PatchCollection(patches, color='red', alpha=0.6)
+            ax.add_collection(p)    
+        elif element.element_type == 'slit' :
+            patches = magnet_patches(element, start_point=start_point, orientation=orientation)
+            p = PatchCollection(patches, color='dimgray', alpha=0.8)
+            ax.add_collection(p)   
+        
+            
+        start_point = start_point + [element.length , 0]
+        
+    plt.xlim([-0.1, start_point[0]])
+    plt.ylim([-0.2,0.2])
+    plt.show()

@@ -442,7 +442,8 @@ def quad_matrix(L,B,a,p,rest_mass=938):
     
     gamma = PtoGamma(p,rest_mass)
     
-    Brho  = PtoBrho(p,rest_mass)
+    Brho  = PtoBrho(p)
+    
     #Brho  = 1/300*sqrt(refE**2+2*938*refE)
     k_q  = sqrt(abs(B)/a*(1/Brho))
     
@@ -536,7 +537,7 @@ def sextupole(L,B,a,alpha,beam,it_z,refE,N_segments = 10):
 
 def sec_bend_matrix(L,B,n,p,rest_mass=938):
     
-    Brho  = PtoBrho(p,rest_mass)
+    Brho  = PtoBrho(p)
     h = B/Brho
     
     if n>0 and n<1:
@@ -1101,11 +1102,11 @@ def RtoE(R):
     return E    
 
 def EtoBrho(E,rest_mass=938):
-    Brho  = 1/rest_mass*sqrt(E**2+2*rest_mass*E)
+    Brho  = 1/300*sqrt(E**2+2*rest_mass*E)
     return Brho
 
-def PtoBrho(p,rest_mass=938):
-    Brho  = 1/rest_mass*p
+def PtoBrho(p):
+    Brho  = 1/300*p
     return Brho
 
 def Brho_scaling(refE,newE,rest_mass=938):

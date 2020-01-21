@@ -12,6 +12,7 @@ from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt
 from scipy.optimize import curve_fit
 
 import warnings
+import time
 #import matplotlib.pyplot as plt
 
 
@@ -540,6 +541,7 @@ def sec_bend_matrix(L,B,n,p,rest_mass=938):
     Brho  = PtoBrho(p)
     h = B/Brho
     
+    
     if n>0 and n<1:
         kx  = sqrt((1-n)*h**2)
         ky  = sqrt(n*h**2) 
@@ -583,6 +585,9 @@ def sec_bend_matrix(L,B,n,p,rest_mass=938):
                               [0,0,0,1,0,0],
                               [-h/kx*sin(kx*L),-h/kx**2*(1-cos(kx*L)),0,0,1,-h**2/kx**3*(kx*L-sin(kx*L))],
                               [0,0,0,0,0,1]])
+    
+    
+    
     
     return bend_mat
 

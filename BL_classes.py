@@ -12,6 +12,7 @@ from scipy.stats import norm
 from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat, Highland
 from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, pi
 import warnings
+import time
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -114,30 +115,18 @@ class Beamline:
         
         # divide element in many slices
         slice_element = element 
-        slice_element.length = element.length/element.N_segments
+        slice_element.length = element.length
         
-        for i in np.arange(0, element.N_segments):
-            
-            if i!=0:
-                # not first sub-element
-                if element.element_type == 'dipole':
-                    slice_element.pole_face1 = np.nan
-            
-            if i != element.N_segments-1:
-                # not last sub-element
-                if element.element_type == 'dipole':
-                    slice_element.pole_face2 = np.nan
-            
-            
-            new_row = pd.DataFrame(data = [[self.get_z() + slice_element.length, \
-                                            slice_element.name, \
-                                            slice_element.element_type, \
-                                            slice_element ]], \
-                                     columns = self.BL_df.columns)
-            
-            
-            
-            self.BL_df = self.BL_df.append(new_row, ignore_index=True)
+        
+        new_row = pd.DataFrame(data = [[self.get_z() + slice_element.length, \
+                                        slice_element.name, \
+                                        slice_element.element_type, \
+                                        slice_element ]], \
+                                 columns = self.BL_df.columns)
+        
+        
+        
+        self.BL_df = self.BL_df.append(new_row, ignore_index=True)
             
         
 
@@ -203,8 +192,11 @@ class Particle:
             particle_through_drift(self, element)
             
         elif element.element_type == "dipole" :
+            
+            N_segments = element.N_segments
+            
             B = element.Bfield
-            L = element.length
+            L = element.length/N_segments
             n = element.order
             k1 = element.k1
             k2 = element.k2
@@ -216,43 +208,65 @@ class Particle:
             dipole_mat = sec_bend_matrix(L,B,n, self.get_p(), rest_mass=self.rest_mass)
             
             
-            # add pole face calculations if non zero
+            # entrance pole face calculations if non zero
             if ~np.isnan(pole_face1) :
                 angle_mat1 = pole_face_mat(pole_face1, B, apertureY, self.get_p(), k1, k2)
-                dipole_mat = angle_mat1 * dipole_mat
+                # calculate new particle properties and put them in a new raw
+                new_row = pd.DataFrame(data = [np.matmul(angle_mat1, self.get_vect())], \
+                                         columns = self.p_df.columns)
+                self.p_df = self.p_df.append(new_row, ignore_index=True)
+                
+                # update z
+                self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z()], columns = ['z [m]']), ignore_index=True)
+            
+            # insisde dipole
+            vect = self.get_vect()
+            for i in np.arange(0, N_segments):
+                # calculate new particle properties and put them in a new raw
+                vect = np.matmul(dipole_mat, vect)
+                new_row = pd.DataFrame(data = [vect], \
+                                         columns = self.p_df.columns)
+                self.p_df = self.p_df.append(new_row, ignore_index=True)
+                
+                # update z
+                self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z() + L], columns = ['z [m]']), ignore_index=True)
+            
+            # exit pole face calculations if non zero
             if ~np.isnan(pole_face2) :
                 angle_mat2 = pole_face_mat(pole_face2, B, apertureY, self.get_p(), k1, k2)
-                dipole_mat = dipole_mat * angle_mat2
+                # calculate new particle properties and put them in a new raw
+                new_row = pd.DataFrame(data = [np.matmul(angle_mat2, self.get_vect())], \
+                                         columns = self.p_df.columns)
+                self.p_df = self.p_df.append(new_row, ignore_index=True)
                 
-            # calculate new particle properties and put them in a new raw
-            new_row = pd.DataFrame(data = [np.matmul(dipole_mat, self.get_vect())], \
-                                     columns = self.p_df.columns)
-            self.p_df = self.p_df.append(new_row, ignore_index=True)
+                # update z
+                self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z()], columns = ['z [m]']), ignore_index=True)
+                
             
-            # update z
-            self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z() + L], columns = ['z [m]']), ignore_index=True)
             
-        
+            
         elif element.element_type == "quad" :
             
-            
+            N_segments = element.N_segments
         
             B = element.Bfield
-            L = element.length
+            L = element.length/N_segments
             a = element.apertureY
-            
-            
             
             quad_mat = quad_matrix(L, B, a, self.get_p(), rest_mass=self.rest_mass)
             
             
-            # calculate new particle properties and put them in a new raw
-            new_row = pd.DataFrame(data = [np.matmul(quad_mat, self.get_vect())], \
-                                     columns = self.p_df.columns)
-            self.p_df = self.p_df.append(new_row, ignore_index=True)
+            vect = self.get_vect()
             
-            # update z
-            self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z() + L], columns = ['z [m]']), ignore_index=True)
+            for i in np.arange(0, N_segments):
+                # calculate new particle properties and put them in a new raw
+                vect = np.matmul(quad_mat, vect)
+                new_row = pd.DataFrame(data = [vect], \
+                                         columns = self.p_df.columns)
+                self.p_df = self.p_df.append(new_row, ignore_index=True)
+                
+                # update z
+                self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z() + L], columns = ['z [m]']), ignore_index=True)
         
         elif element.element_type == "slit" :
             particle_through_slit(self, element)
@@ -276,8 +290,8 @@ class Beam:
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform', \
                        particle_type='proton'):
         
-        # initialize empty dataframe
-        self.beam_df = pd.DataFrame(columns = ['Particle objects']) 
+        # initialize empty list of particles
+        self.particle_list = []
         
         for i in range(0,nb_part):
             # initialize particle properties
@@ -320,24 +334,19 @@ class Beam:
             # create new particle
             new_particle = Particle(z=0, x=sizeX , y=sizeY, divX=divX, divY=divY, \
                                     dL=0, p=EtoP(E), refp=EtoP(refE), particle_type=particle_type)
-            
-            # put new particle in beam
-            self.beam_df = \
-            self.beam_df.append(pd.DataFrame(data = [new_particle], columns = self.beam_df.columns), \
-                            ignore_index=True)                                                                                        
+                                                                                                   
         
-    
+            self.particle_list = self.particle_list + [new_particle]
     
         
     def add_particle(self, particle : Particle()):
-        self.beam_df = self.beam_df.append(pd.DataFrame(data = particle, columns = self.beam_df.columns), \
-                            ignore_index=True)
+        self.particle_list = self.particle_list + [particle]
         
     def get_beam_X(self, row_nb=-1):
         """ get the X coordinates of all the particles in the beam in a given row"""
         
         X = [] # list of particle positions in X
-        for particle in self.beam_df['Particle objects'].values :
+        for particle in self.particle_list :
             X.append(particle.get_x(row_nb))
         
         return np.asarray(X) # convert to numpy
@@ -594,33 +603,55 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start
     
     return patches
         
-def BL_plot(BL : Beamline, orientation = 'ZX'):
+def BL_plot(BL : Beamline):
     """ Possible orientations for plot: ZX or ZY """
     
     start_point = np.array([0,0])
     
     element_list = BL.BL_df['BL object'].values
     
-    fig, ax = plt.subplots()
+    fig = plt.figure('Beamline',figsize=(9, 6))
+    ax_X = fig.add_subplot(2,1,1)
+    ax_Y = fig.add_subplot(2,1,2)
     
     for element in element_list:
         
         if element.element_type == 'dipole' :
-            patches = magnet_patches(element, start_point=start_point, orientation=orientation)
+            patches = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='blue', alpha=0.6)
-            ax.add_collection(p)
+            ax_X.add_collection(p)
+            
+            patches = magnet_patches(element, start_point=start_point, orientation='ZY')
+            p = PatchCollection(patches, color='blue', alpha=0.6)
+            ax_Y.add_collection(p)
         elif element.element_type == 'quad' :
-            patches = magnet_patches(element, start_point=start_point, orientation=orientation)
+            patches = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='red', alpha=0.6)
-            ax.add_collection(p)    
+            ax_X.add_collection(p) 
+            
+            patches = magnet_patches(element, start_point=start_point, orientation='ZY')
+            p = PatchCollection(patches, color='red', alpha=0.6)
+            ax_Y.add_collection(p) 
         elif element.element_type == 'slit' :
-            patches = magnet_patches(element, start_point=start_point, orientation=orientation)
+            patches = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='dimgray', alpha=0.8)
-            ax.add_collection(p)   
+            ax_X.add_collection(p)   
+            
+            patches = magnet_patches(element, start_point=start_point, orientation='ZY')
+            p = PatchCollection(patches, color='dimgray', alpha=0.8)
+            ax_Y.add_collection(p)   
         
             
         start_point = start_point + [element.length , 0]
         
-    plt.xlim([-0.1, start_point[0]])
-    plt.ylim([-0.2,0.2])
-    plt.show()
+    ax_X.set_xlim([-0.1, start_point[0]])
+    ax_X.set_ylim([-0.15,0.15])
+    ax_X.set_xlabel('z [m]')
+    ax_X.set_ylabel('x [m]')
+    
+    ax_Y.set_xlim([-0.1, start_point[0]])
+    ax_Y.set_ylim([-0.15,0.15])
+    ax_Y.set_xlabel('z [m]')
+    ax_Y.set_ylabel('y [m]')
+    
+    return [fig, ax_X, ax_Y]

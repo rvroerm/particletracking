@@ -20,18 +20,24 @@ my_beamline = create_BL_from_Transport(input_file, CCT_angle = pi/6)
 
 [fig, ax_X, ax_Y] = BL_plot(my_beamline)
 
-my_beam = Beam(nb_part=10, refE = 160, DeltaE=5, E_dist='uniform',  \
+my_beam = Beam(nb_part=1000, refE = 160, DeltaE=5, E_dist='uniform',  \
                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='cst')
 
 
 
+t0 = time.time()
+
 
 for particle in my_beam.particle_list :
     
-    t0 = time.time()
-    particle.particle_through_BL(my_beamline)
-    print("exec time tot  %.2E \n "%(time.time() - t0))
     
-    ax_X.plot(particle.z_df.values, particle.p_df[['x [m]']].values)
-    ax_Y.plot(particle.z_df.values, particle.p_df[['y [m]']].values)
+    particle.particle_through_BL(my_beamline)
+    
+    
+    ax_X.plot(particle.z[0:particle.it], particle.X[0:particle.it,0])
+    ax_Y.plot(particle.z[0:particle.it], particle.X[0:particle.it,2])
+    
+    
+    
+print("exec time tot  %.2E \n "%(time.time() - t0))

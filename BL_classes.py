@@ -29,17 +29,21 @@ class BL_Element:
         self.element_type = "drift" # default is a drift
         self.N_segments = 1
         self.curvature = 0 # curvature of the element (cf. dipole case)
-        
+        self.aperture_type = "rectangular" # shape of element aperture (or vaccum chamber)
+        self.apertureX = 1 # default aperture = 1m
+        self.apertureY = 1 # default aperture = 1m
         
         
     def dipole(self, B, n, apertureY, apertureX=0, pole_face1=0, pole_face2=0, \
-               curvature=0, CCT_angle = 0, k1 = 0.5, k2 = 0, nb_pts=10):
+               curvature=0, CCT_angle = 0, k1 = 0.5, k2 = 0, \
+               aperture_type = 'circular' ,nb_pts=10):
         self.element_type = "dipole"
         self.Bfield = B
         self.order = n
         self.apertureY = apertureY
         if apertureX == 0: self.apertureX = apertureY # unless specified, the aperture is symmetrical
         else: self.apertureX = apertureX
+        self.aperture_type = aperture_type # rectanglar or circular
         self.k1 = k1
         self.k2 = k2
         self.pole_face1 = pole_face1
@@ -63,6 +67,7 @@ class BL_Element:
         self.Bfield = B
         self.apertureX = a
         self.apertureY = a
+        self.aperture_type = "circular"
         self.N_segments = nb_pts
         self.CCT_angle = CCT_angle # angle of the windings in the CCT case
         
@@ -71,6 +76,7 @@ class BL_Element:
         self.Bfield = B
         self.apertureX = a
         self.apertureY = a
+        self.aperture_type = "circular"
         self.N_segments = nb_pts
         self.CCT_angle = CCT_angle # angle of the windings in the CCT case
         
@@ -79,15 +85,16 @@ class BL_Element:
         self.Bfield = B
         self.apertureX = a
         self.apertureY = a
+        self.aperture_type = "circular"
         self.N_segments = nb_pts
         
     def slit(self, gap, orientation='X', mat ='tantalum', offset = 0, nb_pts=20):
         self.element_type = "slit"
         
         if orientation == 'X':
-            self.apertureX = gap
+            self.apertureX = gap/2
         elif orientation == 'Y':
-            self.apertureY = gap
+            self.apertureY = gap/2
             
         self.orientation = orientation
         self.material = mat
@@ -133,9 +140,12 @@ class Beamline:
 
 
 class Particle:
-    
-    def __init__(self, z=0, x=0, y=0, divX=0, divY=0, dL=0, p=0, refp=1, particle_type='proton'):
         
+    def __init__(self, z=0, x=0, y=0, divX=0, divY=0, dL=0, p=0, refp=1, particle_type='proton', max_it=1000):
+        """ 
+        Create particle with some initial parameters 
+        max_it = number of transformations the particle can go through in the beamline
+        """
         
         if particle_type=='proton' : self.rest_mass = 938
         else: raise Exception("Particle type is not known")
@@ -143,53 +153,129 @@ class Particle:
         if refp <= 0:
             raise Exception("Reference energy is not a positive number")
         
-        
-        
-        # build dataframe with z coordinate
-        self.z_df = pd.DataFrame([[z]] , columns = ['z [m]'])
-        
-        # build dataframe with particle properties
-        self.p_df = pd.DataFrame([[x, divX, y, divY, dL, (p-refp)/refp]], \
-                            columns = ['x [m]','div x [rad]','y [m]','div y [rad]','dL [m]','dp/p'])
-        
-        
-        
-        
         self.refp = refp
         self.particle_type = particle_type
         
+        self.it = 0
+        
+        # initialize z coordinate
+        self.z = np.empty(shape = [max_it, 1])
+        self.z[0] = z
+        
+        # nitialize particle dynamic properties
+        self.X = np.empty(shape = [max_it, 6])
+        self.X[0, :] = [x, divX, y, divY, dL, (p-refp)/refp]
     
+    def get_z(self, row_nb=-1): 
+        if row_nb == -1:  return self.z[self.it] # last value that was updated
+        else:   return self.z[row_nb]
     
-    def get_z(self, row_nb=-1): return self.z_df[['z [m]']].iloc[row_nb,0]
-    
-    def get_x(self, row_nb=-1): return self.p_df[['x [m]']].iloc[row_nb,0]
-    def get_y(self, row_nb=-1): return self.p_df[['y [m]']].iloc[row_nb,0]
-    def get_divx(self, row_nb=-1): return self.p_df[['div x [rad]']].iloc[row_nb,0]
-    def get_divy(self, row_nb=-1): return self.p_df[['div y [rad]']].iloc[row_nb,0]
-    def get_dL(self, row_nb=-1): return self.p_df[['dL [m]']].iloc[row_nb,0]
-    def get_dponp(self, row_nb=-1): return self.p_df[['dp/p']].iloc[row_nb,0]
+    def get_x(self, row_nb=-1):
+        if row_nb == -1:  return self.X[self.it, 0] # last value that was updated
+        else:   return self.X[row_nb, 0]
+        
+    def get_y(self, row_nb=-1): 
+        if row_nb == -1:  return self.X[self.it, 2] # last value that was updated
+        else:   return self.X[row_nb, 2]
+        
+    def get_divx(self, row_nb=-1): 
+        if row_nb == -1:  return self.X[self.it, 1] # last value that was updated
+        else:   return self.X[row_nb, 1]
+        
+    def get_divy(self, row_nb=-1):
+        if row_nb == -1:  return self.X[self.it, 3] # last value that was updated
+        else:   return self.X[row_nb, 3]
+        
+    def get_dL(self, row_nb=-1): 
+        if row_nb == -1:  return self.X[self.it, 4] # last value that was updated
+        else:   return self.X[row_nb, 4]
+        
+    def get_dponp(self, row_nb=-1): 
+        if row_nb == -1:  return self.X[self.it, 5] # last value that was updated
+        else:   return self.X[row_nb, 5]
+        
     def get_vect(self, row_nb=-1): 
         # get beam properties at row=row_nb, default=last row
-        return self.p_df[['x [m]','div x [rad]','y [m]','div y [rad]','dL [m]','dp/p']].iloc[row_nb].to_numpy()
+        if row_nb == -1:  return self.X[self.it, :] # last value that was updated
+        else:   return self.X[row_nb, :]
     
     def get_p(self, row_nb=-1): return self.get_dponp(row_nb)*self.refp + self.refp
     def get_E(self, row_nb=-1): return PtoE(self.get_p(row_nb))
     
     def plot_x(self): # example, to put in separate function later
-        plt.plot(self.z_df, self.p_df[['x [m]']])
+        plt.plot(self.z, self.X[:, 0])
         
+    
+    def particle_through_drift(self, drift : BL_Element):
+        L = drift.length
+        drift_mat = drift_matrix(L, self.get_p(), rest_mass=self.rest_mass)
+        
+        # calculate new particle properties 
+        self.it = self.it + 1
+        self.X[self.it, :] = np.matmul(drift_mat, self.X[self.it - 1, :])
+        self.z[self.it] = self.z[self.it-1] + L
+        
+        return 
+    
+    
+    def particle_through_slit(self, slit : BL_Element):
+        """
+        slit with 2 blades (left and right)
+        """
+        
+        L_segment = slit.length/slit.N_segments
+        
+        if slit.orientation == 'X':
+            left_blade = -slit.apertureX/2 + slit.offset
+            right_blade = slit.apertureX/2 + slit.offset
+        elif slit.orientation == 'Y':
+            left_blade = -slit.apertureY/2 + slit.offset
+            right_blade = slit.apertureY/2 + slit.offset
+        
+        for i in range(0, slit.N_segments):
+            if slit.orientation == 'X':
+                pos = self.get_x()
+            elif slit.orientation == 'Y':
+                pos = self.get_y()
+            
+            
+            if (pos <= left_blade or pos >= right_blade): # particle hits the slit
+                    
+                self.it = self.it + 1
+                
+                [self.X[self.it, :] , sigma] = Highland(L_segment, slit.material, self.X[self.it - 1, :], PtoE(self.refp))
+                
+                self.z[self.it] = self.z[self.it-1] + L_segment
+                
+                
+            else: # particle passes through --> drift
+                self.particle_through_drift(BL_Element(length=L_segment))
+        
+        return 
+    
+    
+    
+    def kill_lost_particle(self, element: BL_Element):
+        if element.aperture_type == "rectangular":
+            if abs(self.X[self.it, 0]) > element.apertureX or abs(self.X[self.it, 2]) > element.apertureY :
+                # kill particle
+                self.X[self.it, :] = np.nan
+        elif element.aperture_type == "circular":
+            if (self.X[self.it, 0])**2 + (self.X[self.it, 2])**2 > element.apertureY**2:
+                # kill particle
+                self.X[self.it, :] = np.nan
     
     def particle_through_BLelement(self, element : BL_Element):
         
         if np.isnan(self.get_dponp()) :
             # add rows with NAN
-            self.p_df = self.p_df.append(pd.Series(), ignore_index=True)
-            self.z_df = self.z_df.append(pd.Series(), ignore_index=True)
+            self.it = self.it + 1
+            self.X[self.it, :] = np.nan
+            self.z[self.it] = self.z[self.it-1] + element.length
             return
         
-        
         if element.element_type == "drift" :            
-            particle_through_drift(self, element)
+            self.particle_through_drift(element)
             
         elif element.element_type == "dipole" :
             
@@ -211,40 +297,33 @@ class Particle:
             # entrance pole face calculations if non zero
             if ~np.isnan(pole_face1) :
                 angle_mat1 = pole_face_mat(pole_face1, B, apertureY, self.get_p(), k1, k2)
-                # calculate new particle properties and put them in a new raw
-                new_row = pd.DataFrame(data = [np.matmul(angle_mat1, self.get_vect())], \
-                                         columns = self.p_df.columns)
-                self.p_df = self.p_df.append(new_row, ignore_index=True)
                 
-                # update z
-                self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z()], columns = ['z [m]']), ignore_index=True)
+                # calculate new particle properties 
+                self.it = self.it + 1
+                self.X[self.it, :] = np.matmul(angle_mat1, self.X[self.it - 1, :])
+                self.z[self.it] = self.z[self.it-1] 
+                
+                
             
             # insisde dipole
-            vect = self.get_vect()
             for i in np.arange(0, N_segments):
                 # calculate new particle properties and put them in a new raw
-                vect = np.matmul(dipole_mat, vect)
-                new_row = pd.DataFrame(data = [vect], \
-                                         columns = self.p_df.columns)
-                self.p_df = self.p_df.append(new_row, ignore_index=True)
                 
-                # update z
-                self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z() + L], columns = ['z [m]']), ignore_index=True)
-            
+                self.it = self.it + 1
+                self.X[self.it, :] = np.matmul(dipole_mat, self.X[self.it - 1, :])
+                self.z[self.it] = self.z[self.it-1] + L
+                
+                self.kill_lost_particle(element)
+                
             # exit pole face calculations if non zero
             if ~np.isnan(pole_face2) :
                 angle_mat2 = pole_face_mat(pole_face2, B, apertureY, self.get_p(), k1, k2)
-                # calculate new particle properties and put them in a new raw
-                new_row = pd.DataFrame(data = [np.matmul(angle_mat2, self.get_vect())], \
-                                         columns = self.p_df.columns)
-                self.p_df = self.p_df.append(new_row, ignore_index=True)
                 
-                # update z
-                self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z()], columns = ['z [m]']), ignore_index=True)
+                # calculate new particle properties 
+                self.it = self.it + 1
+                self.X[self.it, :] = np.matmul(angle_mat2, self.X[self.it - 1, :])
+                self.z[self.it] = self.z[self.it-1] 
                 
-            
-            
-            
         elif element.element_type == "quad" :
             
             N_segments = element.N_segments
@@ -256,20 +335,16 @@ class Particle:
             quad_mat = quad_matrix(L, B, a, self.get_p(), rest_mass=self.rest_mass)
             
             
-            vect = self.get_vect()
-            
             for i in np.arange(0, N_segments):
-                # calculate new particle properties and put them in a new raw
-                vect = np.matmul(quad_mat, vect)
-                new_row = pd.DataFrame(data = [vect], \
-                                         columns = self.p_df.columns)
-                self.p_df = self.p_df.append(new_row, ignore_index=True)
+                # calculate new particle properties 
+                self.it = self.it + 1
+                self.X[self.it, :] = np.matmul(quad_mat, self.X[self.it - 1, :])
+                self.z[self.it] = self.z[self.it-1] + L
                 
-                # update z
-                self.z_df = self.z_df.append(pd.DataFrame(data = [self.get_z() + L], columns = ['z [m]']), ignore_index=True)
-        
-        elif element.element_type == "slit" :
-            particle_through_slit(self, element)
+                self.kill_lost_particle(element)
+                
+        elif element.element_type == "slit" :                
+            self.particle_through_slit(element)
         else:
             warnings.warn("Element transfer function not defined: ",element.element_type) 
             
@@ -278,8 +353,10 @@ class Particle:
     def particle_through_BL(self, BL : Beamline()):
         
         for index, row in BL.BL_df.iterrows(): # loop all elements into BL
+            #print(" \n  BL element: %s (%s) ; z =  %.2e"%(row['Element name'],row['Element type'],BL.get_z(index)))
+            
             self.particle_through_BLelement(row['BL object'])
-        
+            #print(self.get_z())
 
 
 class Beam:
@@ -498,60 +575,10 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
 
 
 
-def particle_through_drift(particle: Particle, drift : BL_Element):
-    L = drift.length
-    drift_mat = drift_matrix(L, particle.get_p(), rest_mass=particle.rest_mass)
-    
-    # calculate new particle properties and put them in a new raw
-    new_row = pd.DataFrame(data = [np.matmul(drift_mat, particle.get_vect())], \
-                             columns = particle.p_df.columns)
-    particle.p_df = particle.p_df.append(new_row, ignore_index=True)
-    
-    # update z
-    particle.z_df = particle.z_df.append(pd.DataFrame(data = [particle.get_z() + L], columns = ['z [m]']), ignore_index=True)
-    
-    return particle
+
     
 
-def particle_through_slit(particle: Particle, slit : BL_Element):
-    """
-    slit with 2 blades (left and right)
-    """
-    
-    L_segment = slit.length/slit.N_segments
-    
-    if slit.orientation == 'X':
-        left_blade = -slit.apertureX/2 + slit.offset
-        right_blade = slit.apertureX/2 + slit.offset
-    elif slit.orientation == 'Y':
-        left_blade = -slit.apertureY/2 + slit.offset
-        right_blade = slit.apertureY/2 + slit.offset
-    
-    for i in range(0, slit.N_segments):
-        if slit.orientation == 'X':
-            pos = particle.get_x()
-        elif slit.orientation == 'Y':
-            pos = particle.get_y()
-        
-        if (pos <= left_blade or pos >= right_blade): # particle hits the slit
-                
-            [new_vect, sigma] = Highland(L_segment, slit.material, particle.get_vect(), PtoE(particle.refp))
-            
-            
-            new_row = pd.DataFrame(data = [new_vect], columns = particle.p_df.columns)
-            particle.p_df = particle.p_df.append(new_row, ignore_index=True)
-            
-            # update z
-            particle.z_df = particle.z_df.append(\
-                                                 pd.DataFrame(data = [particle.get_z() + L_segment], \
-                                                 columns = ['z [m]']), ignore_index=True)
-            
-        else: # particle passes through --> drift
-            particle_through_drift(particle, BL_Element(L_segment))
-    
-    
-    
-    return particle
+
 
 
 

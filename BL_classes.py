@@ -169,7 +169,7 @@ class Particle:
         self.it = 0
         
         # initialize z coordinate
-        self.z = np.empty(shape = [max_it, 1])
+        self.z = np.empty(shape = [max_it,])
         self.z[0] = z
         
         # nitialize particle dynamic properties
@@ -279,9 +279,11 @@ class Particle:
         
         if np.isnan(self.get_dponp()) :
             # add rows with NAN
-            self.it = self.it + 1
-            self.X[self.it, :] = np.nan
-            self.z[self.it] = self.z[self.it-1] + element.length
+            
+            for i in np.arange(0, element.N_segments):
+                self.it = self.it + 1
+                self.X[self.it, :] = np.nan
+                self.z[self.it] = self.z[self.it-1] + element.length/element.N_segments
             return
         
         if element.element_type == "drift" :            
@@ -429,14 +431,14 @@ class Beam:
     def add_particle(self, particle : Particle()):
         self.particle_list = self.particle_list + [particle]
         
-    def get_beam_X(self, row_nb=-1):
+    def get_beam_x(self, row_nb=-1):
         """ get the X coordinates of all the particles in the beam in a given row"""
         
-        X = [] # list of particle positions in X
+        x = [] # list of particle positions in X
         for particle in self.particle_list :
-            X.append(particle.get_x(row_nb))
+            x.append(particle.get_x(row_nb))
         
-        return np.asarray(X) # convert to numpy
+        return np.asarray(x) # convert to numpy
     
     
     def size_X(self, row_nb=-1):

@@ -13,6 +13,7 @@ from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad
 from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, pi
 import warnings
 import time
+import copy
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -118,6 +119,7 @@ class Beamline:
         
     def get_z(self, row_nb=-1): return self.BL_df[['z [m]']].iloc[row_nb,0]
     
+    
     def add_element(self, element: BL_Element()):
         
         # divide element in many slices
@@ -134,10 +136,18 @@ class Beamline:
         
         
         self.BL_df = self.BL_df.append(new_row, ignore_index=True)
+    
+    
+    def get_element_index(self, element_name):
+        """ returns the index of an element in the beamline """
+        for index, row in self.BL_df[['Element name']].iterrows():   
+            if row.values[0] == element_name:
+                return index
             
+        # out of loop --> element not found
+        raise Exception("Element %s is not present in beamline"%element_name)
+    
         
-
-
 
 class Particle:
         
@@ -607,18 +617,23 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start
     
     
     if coil_height > 0:
-        h = coil_height
+        h = coil_height + 0.02 # add 2 cm for formers/insulation/etc
     else:
-        h = 2 * a # default value for coil representation
+        h = 2 * a + 0.02 # default value for coil representation ; add 2 cm for formers
     L = element.length
     
     if hasattr(element, 'CCT_angle'):
-        CCT_angle = element.CCT_angle
+        if element.element_type == 'dipole':
+            CCT_angle = element.CCT_angle
+        elif  element.element_type == 'quad':
+            CCT_angle = element.CCT_angle/2
+        elif  element.element_type == 'sext':
+            CCT_angle = element.CCT_angle/3    
     else:
         CCT_angle = 0
     
-    upper_points = [[x0, y0 + a] , [x0 + L, y0 + a] , [x0 + L + tan(CCT_angle)*a, y0 + a + h], [x0 - tan(CCT_angle)*a, y0 + a + h] ]
-    lower_points = [[x0, y0 - a] , [x0 + L, y0 - a] , [x0 + L + tan(CCT_angle)*a, y0 - a - h], [x0 - tan(CCT_angle)*a, y0 - a - h] ]
+    upper_points = [[x0, y0 + a] , [x0 + L, y0 + a] , [x0 + L + tan(CCT_angle)*h, y0 + a + h], [x0 - tan(CCT_angle)*h, y0 + a + h] ]
+    lower_points = [[x0, y0 - a] , [x0 + L, y0 - a] , [x0 + L + tan(CCT_angle)*h, y0 - a - h], [x0 - tan(CCT_angle)*h, y0 - a - h] ]
     
     patches = []
     
@@ -628,7 +643,11 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start
     polygon2 = Polygon(np.array(lower_points), closed = True)
     patches.append(polygon2)
     
-    return patches
+    # coordinates for labelling
+    center_x = x0 + L/2
+    center_y = y0 + a + h/2
+    
+    return [patches, center_x, center_y]
         
 def BL_plot(BL : Beamline):
     """ Possible orientations for plot: ZX or ZY """
@@ -637,34 +656,50 @@ def BL_plot(BL : Beamline):
     
     element_list = BL.BL_df['BL object'].values
     
-    fig = plt.figure('Beamline',figsize=(9, 6))
+    fig = plt.figure('Beamline',figsize=(18, 12))
+    
+    # increase vertical space between plots
+    fig.subplots_adjust(hspace=0.4)
+    
     ax_X = fig.add_subplot(2,1,1)
     ax_Y = fig.add_subplot(2,1,2)
     
     for element in element_list:
         
         if element.element_type == 'dipole' :
-            patches = magnet_patches(element, start_point=start_point, orientation='ZX')
+            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='blue', alpha=0.6)
             ax_X.add_collection(p)
             
-            patches = magnet_patches(element, start_point=start_point, orientation='ZY')
+            ax_X.text(center_x, center_y, element.name, \
+                      verticalalignment='center', horizontalalignment='center')
+            
+            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
             p = PatchCollection(patches, color='blue', alpha=0.6)
             ax_Y.add_collection(p)
+            ax_Y.text(center_x, center_y, element.name, \
+                      verticalalignment='center', horizontalalignment='center')
+            
         elif element.element_type == 'quad' :
-            patches = magnet_patches(element, start_point=start_point, orientation='ZX')
+            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='red', alpha=0.6)
             ax_X.add_collection(p) 
+            ax_X.text(center_x, center_y, element.name, \
+                      verticalalignment='center', horizontalalignment='center', \
+                      rotation = 90)
             
-            patches = magnet_patches(element, start_point=start_point, orientation='ZY')
+            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
             p = PatchCollection(patches, color='red', alpha=0.6)
-            ax_Y.add_collection(p) 
+            ax_Y.add_collection(p)
+            ax_Y.text(center_x, center_y, element.name, \
+                      verticalalignment='center', horizontalalignment='center', \
+                      rotation = 90)
         elif element.element_type == 'slit' :
-            patches = magnet_patches(element, start_point=start_point, orientation='ZX')
+            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='dimgray', alpha=0.8)
             ax_X.add_collection(p)   
             
-            patches = magnet_patches(element, start_point=start_point, orientation='ZY')
+            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
             p = PatchCollection(patches, color='dimgray', alpha=0.8)
             ax_Y.add_collection(p)   
         
@@ -682,3 +717,8 @@ def BL_plot(BL : Beamline):
     ax_Y.set_ylabel('y [m]')
     
     return [fig, ax_X, ax_Y]
+
+
+        
+        
+        

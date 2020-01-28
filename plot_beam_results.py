@@ -17,7 +17,7 @@ plt.close('all')
 
 np.set_printoptions(precision=3)
 
-def plot_beam(input_file,beam,it_z_ISO,it_z_GTR,ref_p):
+def plot_beam(input_file, beam, it_z_ISO, it_z_GTR, ref_p):
     """
     Plot beam properties
     

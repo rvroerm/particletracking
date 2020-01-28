@@ -12,7 +12,6 @@ from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt
 from scipy.optimize import curve_fit
 
 import warnings
-import time
 #import matplotlib.pyplot as plt
 
 

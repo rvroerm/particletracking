@@ -16,8 +16,7 @@ import time
 import copy
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
-from matplotlib.collections import PatchCollection
+
     
 class BL_Element:
     """
@@ -170,10 +169,12 @@ class Particle:
         
         # initialize z coordinate
         self.z = np.empty(shape = [max_it,])
+        self.z[:] = np.nan
         self.z[0] = z
         
         # nitialize particle dynamic properties
         self.X = np.empty(shape = [max_it, 6])
+        self.X[:, :] = np.nan
         self.X[0, :] = [x, divX, y, divY, dL, (p-refp)/refp]
     
     def get_z(self, row_nb=-1): 
@@ -204,6 +205,7 @@ class Particle:
         if row_nb == -1:  return self.X[self.it, 5] # last value that was updated
         else:   return self.X[row_nb, 5]
         
+        
     def get_vect(self, row_nb=-1): 
         # get beam properties at row=row_nb, default=last row
         if row_nb == -1:  return self.X[self.it, :] # last value that was updated
@@ -212,9 +214,32 @@ class Particle:
     def get_p(self, row_nb=-1): return self.get_dponp(row_nb)*self.refp + self.refp
     def get_E(self, row_nb=-1): return PtoE(self.get_p(row_nb))
     
-    def plot_x(self): # example, to put in separate function later
-        plt.plot(self.z, self.X[:, 0])
+    def get_param(self, param='x', row_nb=-1):
+        if param == 'z' : return self.get_z(row_nb)
+        elif param == 'x' : return self.get_x(row_nb)
+        elif param == 'y' : return self.get_y(row_nb)
+        elif param == 'divx' : return self.get_divx(row_nb)
+        elif param == 'divy' : return self.get_divy(row_nb)
+        elif param == 'dL' : return self.get_dL(row_nb)
+        elif param == 'dponp' : return self.get_dponp(row_nb)
+        elif param == 'p' : return self.get_p(row_nb)
+        elif param == 'E' : return self.get_E(row_nb)
+        else: raise Exception("Parameter %s is not valid"%param) 
+    
+    def get_z_index(self, z_lookup, tolerance =10**-6):
+        """ return index of a given value of z (z_lookup) """
         
+        # remove nan from z list
+        z_list = self.z[:] 
+        z_list[np.isnan(z_list)] = 0
+        
+        p_index = np.where( abs(z_list - z_lookup) < tolerance )
+        if len(p_index[0]) == 1 :
+            p_index = np.asscalar(p_index[0])
+        else:
+            raise Exception('ISO not found')
+            
+        return p_index
     
     def particle_through_drift(self, drift : BL_Element):
         L = drift.length
@@ -236,11 +261,11 @@ class Particle:
         L_segment = slit.length/slit.N_segments
         
         if slit.orientation == 'X':
-            left_blade = -slit.apertureX/2 + slit.offset
-            right_blade = slit.apertureX/2 + slit.offset
+            left_blade = -slit.apertureX - slit.offset
+            right_blade = slit.apertureX - slit.offset
         elif slit.orientation == 'Y':
-            left_blade = -slit.apertureY/2 + slit.offset
-            right_blade = slit.apertureY/2 + slit.offset
+            left_blade = -slit.apertureY - slit.offset
+            right_blade = slit.apertureY - slit.offset
         
         for i in range(0, slit.N_segments):
             if slit.orientation == 'X':
@@ -440,9 +465,21 @@ class Beam:
         
         return np.asarray(x) # convert to numpy
     
-    
+    def get_beam_param(self, param='x', row_nb=-1):
+        """ 
+        get the values for the parameter 'param' for all the particles in the beam in a given row
+        possible values for param: (z, x, y, divx, divy, dL, dponp, p, E)
+        """
+        my_list = [] # list of values for chosen parameter
+        for particle in self.particle_list :
+            my_list.append(particle.get_param(param=param, row_nb=row_nb))
+        
+        return np.asarray(my_list) # convert to numpy
+        
+        
+        
     def size_X(self, row_nb=-1):
-        X = self.get_beam_X(row_nb)
+        X = self.get_beam_x(row_nb)
         (muX, sigmaX) = norm.fit(X[~np.isnan(X)])
         return sigmaX
     
@@ -564,6 +601,15 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
                    opening = rightX - leftX
                    offset = rightX + leftX
                    
+                   # check if there is a name
+                   posL = line.find('/')
+                   posR = line.rfind('/')
+                   
+                   if posL != -1 and posR != -1 :
+                       name = line[posL+1 : posR].strip()
+                   else: name = ""
+                   
+                   
                    new_element = BL_Element(name = name, length = L)
                    new_element.slit(opening, orientation='X', mat = mat, offset = offset, nb_pts=20)
                    my_beamline.add_element(new_element)
@@ -595,130 +641,9 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
 
 
 
-def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start_point = np.array([0,0])):
-    """ 
-    Returns coordinates of element used to plot the magnet
-    Possible orientations for plot: ZX or ZY
-    """
-    
-    x0 = start_point[0]
-    y0 = start_point[1]
-    
-    
-    if orientation == 'ZX':
-        if hasattr(element, 'apertureX'):
-            a = element.apertureX
-        else:
-            return []
-    elif orientation == 'ZY':
-        if hasattr(element, 'apertureY'):
-            a = element.apertureY
-        else:
-            return []
-    
-    
-    
-    if coil_height > 0:
-        h = coil_height + 0.02 # add 2 cm for formers/insulation/etc
-    else:
-        h = 2 * a + 0.02 # default value for coil representation ; add 2 cm for formers
-    L = element.length
-    
-    if hasattr(element, 'CCT_angle'):
-        if element.element_type == 'dipole':
-            CCT_angle = element.CCT_angle
-        elif  element.element_type == 'quad':
-            CCT_angle = element.CCT_angle/2
-        elif  element.element_type == 'sext':
-            CCT_angle = element.CCT_angle/3    
-    else:
-        CCT_angle = 0
-    
-    upper_points = [[x0, y0 + a] , [x0 + L, y0 + a] , [x0 + L + tan(CCT_angle)*h, y0 + a + h], [x0 - tan(CCT_angle)*h, y0 + a + h] ]
-    lower_points = [[x0, y0 - a] , [x0 + L, y0 - a] , [x0 + L + tan(CCT_angle)*h, y0 - a - h], [x0 - tan(CCT_angle)*h, y0 - a - h] ]
-    
-    patches = []
-    
-    polygon1 = Polygon(np.array(upper_points), closed = True)
-    patches.append(polygon1)
-    
-    polygon2 = Polygon(np.array(lower_points), closed = True)
-    patches.append(polygon2)
-    
-    # coordinates for labelling
-    center_x = x0 + L/2
-    center_y = y0 + a + h/2
-    
-    return [patches, center_x, center_y]
+
         
-def BL_plot(BL : Beamline):
-    """ Possible orientations for plot: ZX or ZY """
-    
-    start_point = np.array([0,0])
-    
-    element_list = BL.BL_df['BL object'].values
-    
-    fig = plt.figure('Beamline',figsize=(18, 12))
-    
-    # increase vertical space between plots
-    fig.subplots_adjust(hspace=0.4)
-    
-    ax_X = fig.add_subplot(2,1,1)
-    ax_Y = fig.add_subplot(2,1,2)
-    
-    for element in element_list:
-        
-        if element.element_type == 'dipole' :
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
-            p = PatchCollection(patches, color='blue', alpha=0.6)
-            ax_X.add_collection(p)
-            
-            ax_X.text(center_x, center_y, element.name, \
-                      verticalalignment='center', horizontalalignment='center')
-            
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
-            p = PatchCollection(patches, color='blue', alpha=0.6)
-            ax_Y.add_collection(p)
-            ax_Y.text(center_x, center_y, element.name, \
-                      verticalalignment='center', horizontalalignment='center')
-            
-        elif element.element_type == 'quad' :
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
-            p = PatchCollection(patches, color='red', alpha=0.6)
-            ax_X.add_collection(p) 
-            ax_X.text(center_x, center_y, element.name, \
-                      verticalalignment='center', horizontalalignment='center', \
-                      rotation = 90)
-            
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
-            p = PatchCollection(patches, color='red', alpha=0.6)
-            ax_Y.add_collection(p)
-            ax_Y.text(center_x, center_y, element.name, \
-                      verticalalignment='center', horizontalalignment='center', \
-                      rotation = 90)
-        elif element.element_type == 'slit' :
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
-            p = PatchCollection(patches, color='dimgray', alpha=0.8)
-            ax_X.add_collection(p)   
-            
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
-            p = PatchCollection(patches, color='dimgray', alpha=0.8)
-            ax_Y.add_collection(p)   
-        
-            
-        start_point = start_point + [element.length , 0]
-        
-    ax_X.set_xlim([-0.1, start_point[0]])
-    ax_X.set_ylim([-0.15,0.15])
-    ax_X.set_xlabel('z [m]')
-    ax_X.set_ylabel('x [m]')
-    
-    ax_Y.set_xlim([-0.1, start_point[0]])
-    ax_Y.set_ylim([-0.15,0.15])
-    ax_Y.set_xlabel('z [m]')
-    ax_Y.set_ylabel('y [m]')
-    
-    return [fig, ax_X, ax_Y]
+
 
 
         

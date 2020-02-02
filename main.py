@@ -11,10 +11,10 @@ from run_from_transport import run_from_transport
 # parameters
 input_file = "C:/TRANS/for001.dat"
 
-nb_part=1
+nb_part=1000
 refE = 160
 old_refE = 160
-DeltaE=3
+DeltaE=5
 E_dist='cst'
 
 DeltaDivX = 0.05

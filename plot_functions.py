@@ -149,7 +149,7 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start
     if coil_height > 0:
         h = coil_height + 0.02 # add 2 cm for formers/insulation/etc
     else:
-        h = 2 * a + 0.02 # default value for coil representation ; add 2 cm for formers
+        h = 2 * a + 0.04 # default value for coil representation ; add 4 cm for formers
     L = element.length
     
     if hasattr(element, 'CCT_angle'):

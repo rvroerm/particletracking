@@ -5,17 +5,19 @@ Created on Tue Jan 28 13:39:31 2020
 @author: rvroerm
 """
 
-from BL_classes import Particle, Beam, Beamline, BL_Element
-from math import pi, tan
+from BL_classes import Beam, Beamline, BL_Element
+from math import pi, sin, cos, tan
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
+#from planar import Polygon
+
 
 import seaborn as sns
-import time
 import numpy as np
 from scipy.stats import norm
 from transfer_functions import EtoP
+import warnings
 
 plt.close('all')
 
@@ -23,7 +25,7 @@ plt.close('all')
 def plot_beam_through_BL(my_beamline: Beamline, my_beam: Beam):
     """ plot beam through BL """
     
-    [fig, ax_X, ax_Y] = BL_plot(my_beamline)
+    [fig, ax_X, ax_Y] = BL_plot_for_traces(my_beamline)
     
     for particle in my_beam.particle_list :
         
@@ -35,8 +37,11 @@ def plot_beam_through_BL(my_beamline: Beamline, my_beam: Beam):
     return [fig, ax_X, ax_Y]
 
 
-def BL_plot(BL : Beamline):
-    """ Possible orientations for plot: ZX or ZY """
+def BL_plot_for_traces(BL : Beamline):
+    """ 
+    Plots 1D representation or beamline elements on 2 plots: 
+    ZX representation on ax_X subplot and ZY representation on ax_Y subplot
+    """
     
     start_point = np.array([0,0])
     
@@ -65,49 +70,57 @@ def BL_plot(BL : Beamline):
             ax_Y.axvline(x=start_point[0] + element.length, ymin=0.25, ymax=0.75, linestyle='-.', color='grey')
             
         elif element.element_type == 'dipole' :
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
+            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='blue', alpha=0.6)
             ax_X.add_collection(p)
             
-            ax_X.text(center_x, center_y, element.name, \
+            # get coordinates in order to place the label
+            pts_x = list(zip(*patches[0].get_xy()))[0]
+            pts_y = list(zip(*patches[0].get_xy()))[1]
+            ax_X.text(np.average(pts_x), np.average(pts_y), element.name, \
                       verticalalignment='center', horizontalalignment='center')
             
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
+            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZY')
             p = PatchCollection(patches, color='blue', alpha=0.6)
             ax_Y.add_collection(p)
-            ax_Y.text(center_x, center_y, element.name, \
+            ax_Y.text(np.average(pts_x), np.average(pts_y), element.name, \
                       verticalalignment='center', horizontalalignment='center')
             
         elif element.element_type == 'quad' :
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
+            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='red', alpha=0.6)
             ax_X.add_collection(p) 
-            ax_X.text(center_x, center_y, element.name, \
+            # get coordinates in order to place the label
+            pts_x = list(zip(*patches[0].get_xy()))[0]
+            pts_y = list(zip(*patches[0].get_xy()))[1]
+            ax_X.text(np.average(pts_x), np.average(pts_y), element.name, \
                       verticalalignment='center', horizontalalignment='center', \
                       rotation = 90)
             
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
+            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZY')
             p = PatchCollection(patches, color='red', alpha=0.6)
             ax_Y.add_collection(p)
-            ax_Y.text(center_x, center_y, element.name, \
+            ax_Y.text(np.average(pts_x), np.average(pts_y), element.name, \
                       verticalalignment='center', horizontalalignment='center', \
                       rotation = 90)
         elif element.element_type == 'slit' :
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZX')
+            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='dimgray', alpha=0.8)
-            ax_X.add_collection(p)   
-            ax_X.text(center_x, ylim*0.8, element.name, \
+            ax_X.add_collection(p)
+            # get coordinates in order to place the label
+            pts_x = list(zip(*patches[0].get_xy()))[0]
+            pts_y = list(zip(*patches[0].get_xy()))[1]
+            ax_X.text(np.average(pts_x), ylim*0.8, element.name, \
                       verticalalignment='center', horizontalalignment='center', \
                       rotation = 90)
             
-            [patches, center_x, center_y] = magnet_patches(element, start_point=start_point, orientation='ZY')
+            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZY')
             p = PatchCollection(patches, color='dimgray', alpha=0.8)
             ax_Y.add_collection(p) 
-            ax_Y.text(center_x, ylim*0.8, element.name, \
+            ax_Y.text(np.average(pts_x), ylim*0.8, element.name, \
                       verticalalignment='center', horizontalalignment='center', \
                       rotation = 90)
         
-            
         start_point = start_point + [element.length , 0]
         
     ax_X.set_xlim([-0.1, start_point[0]])
@@ -123,12 +136,116 @@ def BL_plot(BL : Beamline):
     return [fig, ax_X, ax_Y]
 
 
-def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start_point = np.array([0,0])):
+
+
+
+
+
+
+
+
+def BL_geometry(BL : Beamline, refp=0):
+    """ 
+    Plot of the gantry structure  
+    """
+    
+    # initial positions
+    start_point = np.array([0,0])
+    rot_mat = [[0,0],[0,0]]
+    rot_angle = 0
+    max_x = 0 # used for framing
+    max_y = 0
+    
+    # get all elements from beamline
+    element_list = BL.BL_df['BL object'].values
+    
+    # initiate figure
+    fig = plt.figure('Beamline 2D',figsize=(18, 12))
+    ax_X = fig.add_subplot(1,1,1)
+    
+    
+    for element in element_list:
+        
+        if element.element_type == 'dipole' :
+            # get element patches and represent it on the figure
+            [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation='ZX', straigth_plot = False, refp=refp)
+            
+            p = PatchCollection(patches, color='blue', alpha=0.6)
+            ax_X.add_collection(p)
+            
+            # get coordinates in order to place the label
+            pts_x = list(zip(*patches[0].get_xy()))[0]
+            pts_y = list(zip(*patches[0].get_xy()))[1]
+            ax_X.text(np.average(pts_x), np.average(pts_y)+0.2, element.name, 
+                      verticalalignment='center', horizontalalignment='center')
+            
+            
+        elif element.element_type == 'quad' :
+            # get element patches and represent it on the figure
+            [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation='ZX', straigth_plot = False)
+            p = PatchCollection(patches, color='red', alpha=0.6)
+            ax_X.add_collection(p) 
+            # get coordinates in order to place the label
+            pts_x = list(zip(*patches[0].get_xy()))[0]
+            pts_y = list(zip(*patches[0].get_xy()))[1]
+            ax_X.text(np.average(pts_x), max(pts_y)+0.2, element.name, 
+                      verticalalignment='center', horizontalalignment='center', 
+                      rotation = 90)
+            
+        elif element.element_type == 'slit' :
+            # get element patches and represent it on the figure
+            [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation='ZX', straigth_plot = False)
+            p = PatchCollection(patches, color='dimgray', alpha=0.8)
+            ax_X.add_collection(p)   
+            # get coordinates in order to place the label
+            pts_x = list(zip(*patches[0].get_xy()))[0]
+            pts_y = list(zip(*patches[0].get_xy()))[1]
+            ax_X.text(np.average(pts_x), max(pts_y)+0.2, element.name, 
+                      verticalalignment='center', horizontalalignment='center', 
+                      rotation = 90)
+        
+        # update starting point for the next element  
+        if element.curvature == 0 :
+            start_point = start_point + np.matmul(rot_mat, [element.length , 0])
+        else:
+            rho = 1/element.curvature
+            magnet_angle = element.length/rho
+            start_point = start_point + np.matmul(rot_mat, [rho*sin(magnet_angle) , rho*(1-cos(magnet_angle))])
+        
+        # update rotation matrix to represent next element in the good orientation
+        rot_mat = [[cos(rot_angle),-sin(rot_angle)],[sin(rot_angle),cos(rot_angle)]]
+        
+        
+        # rescale the plot
+        if start_point[0]>max_x : max_x = start_point[0]
+        if start_point[1]>max_y : max_y = start_point[1]
+            
+        
+        
+        
+    plt.title('representation of the ganry layout')    
+    ax_X.set_xlabel('length [m]')
+    ax_X.set_ylabel('height [m]')
+    ax_X.set_xlim([-0.5,max_x+1]) 
+    ax_X.set_ylim([-0.5,max_y+1]) 
+    
+    return [fig]
+
+
+
+def magnet_patches(element: BL_Element, orientation = 'ZX', \
+                   start_point = np.array([0,0]), start_angle=0, refp=0, \
+                   straigth_plot = True):
     """ 
     Returns coordinates of element used to plot the magnet
     Possible orientations for plot: ZX or ZY
+    start_point = coordinates of the starting point of the magnet (beam point)
+    start_angle = initial orientation of the magnet in the beamline
+    ref_p = impulsion of reference particle given the fields in the magnets (used to compute the magnets curvatures if not set previously)
+    straigth_plot: straight_plot = boolean to plot a 1D or 2D layout (default=1D)
     """
     
+    # initial coordinates of the magnet (beam entry point)
     x0 = start_point[0]
     y0 = start_point[1]
     
@@ -146,11 +263,12 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start
     
     
     
-    if coil_height > 0:
-        h = coil_height + 0.02 # add 2 cm for formers/insulation/etc
+    if element.coil_height > 0:
+        h = element.coil_height + 0.02 # add 2 cm for formers/insulation/etc
     else:
         h = 2 * a + 0.04 # default value for coil representation ; add 4 cm for formers
     L = element.length
+    
     
     if hasattr(element, 'CCT_angle'):
         if element.element_type == 'dipole':
@@ -162,19 +280,90 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', coil_height=0, start
     else:
         CCT_angle = 0
     
-    upper_points = [[x0, y0 + a] , [x0 + L, y0 + a] , [x0 + L + tan(CCT_angle)*h, y0 + a + h], [x0 - tan(CCT_angle)*h, y0 + a + h] ]
-    lower_points = [[x0, y0 - a] , [x0 + L, y0 - a] , [x0 + L + tan(CCT_angle)*h, y0 - a - h], [x0 - tan(CCT_angle)*h, y0 - a - h] ]
     
+    
+    if element.element_type == 'dipole' and not(straigth_plot):
+        N_segments = 10  # divide into segments to represent curvature with polynomial
+        if element.curvature == 0 and refp>0: 
+            # modify only the curvature if not already specified
+            element.set_curvature(element.Bfield, refp)
+        else:
+            warnings.warn("refp not set: cannot estimate bending curvature --> will lead to a 1D plot")
+        bend_angle = element.get_bending_angle() # angle of dipole
+    else:
+        N_segments = 1
+        bend_angle = 0
+    
+    
+    # create rotation matrix if element is tilted
+    alpha = start_angle
+    rot_mat = [[cos(alpha),-sin(alpha)],[sin(alpha),cos(alpha)]]
+    
+    
+    
+    # list of points that describe the edges of the magnet shape
+    # pt1 = inner line of upper magnet 
+    # pt2 = outer line of upper magnet
+    # pt3 = inner line of lower magnet 
+    # pt4 = outer line of lower magnet 
+    pt1 = [np.array([x0,y0]) + np.matmul(rot_mat, [0, a])]
+    pt2 = [np.array([x0,y0]) + np.matmul(rot_mat, [-tan(CCT_angle)*h, a + h])]
+    pt3 = [np.array([x0,y0]) + np.matmul(rot_mat, [0, -a])]
+    pt4 = [np.array([x0,y0]) + np.matmul(rot_mat, [-tan(CCT_angle)*h, -a - h])]
+    
+    # segment lengths
+    L_inner = L/N_segments # length of inner line - straight case
+    L_outer = (L + 2 * tan(CCT_angle)*h)/N_segments # length of outer line - straight case
+    if element.curvature != 0:
+        # angle of section (curved elements)
+        B_angle = bend_angle / N_segments
+        
+        # get curvature of the magnet edges
+        rho = abs(1/element.curvature)
+        up_rot = np.sign(B_angle)
+        rho1 = abs(rho - up_rot*a)*up_rot
+        rho2 = abs(rho - up_rot*(a+h))*up_rot
+        rho3 = abs(rho + up_rot*a)*up_rot
+        rho4 = abs(rho + up_rot*(a+h))*up_rot
+        
+        for it in range(1, N_segments+1):
+            # complete list of points
+            pt1 = pt1 + [pt1[-1] + np.matmul(rot_mat, [rho1*sin(B_angle), rho1*(1-cos(B_angle))])]
+            pt2 = pt2 + [pt2[-1] + np.matmul(rot_mat, [rho2*sin(B_angle), rho2*(1-cos(B_angle))])]
+            pt3 = pt3 + [pt3[-1] + np.matmul(rot_mat, [rho3*sin(B_angle), rho3*(1-cos(B_angle))])]
+            pt4 = pt4 + [pt4[-1] + np.matmul(rot_mat, [rho4*sin(B_angle), rho4*(1-cos(B_angle))])]
+            
+            # update angle and rotation matrix
+            alpha = alpha + B_angle
+            rot_mat = [[cos(alpha),-sin(alpha)],[sin(alpha),cos(alpha)]]
+        
+    else:
+        L1 = L_inner
+        L2 = L_outer
+        L3 = L_inner
+        L4 = L_outer
+    
+        for it in range(1, N_segments+1):
+            # complete list of points
+            pt1 = pt1 + [pt1[-1] + np.matmul(rot_mat, [L1, 0])]
+            pt2 = pt2 + [pt2[-1] + np.matmul(rot_mat, [L2, 0])]
+            pt3 = pt3 + [pt3[-1] + np.matmul(rot_mat, [L3, 0])]
+            pt4 = pt4 + [pt4[-1] + np.matmul(rot_mat, [L4, 0])]
+            
+       
+    # reverse order of points in the outer lines for a convex shape (could also be done in Polygon classs by is_convex argument)
+    pt2.reverse() 
+    pt4.reverse() 
+    upper_pts = pt1 + pt2
+    lower_pts = pt3 + pt4
+    
+    # create patches for plot
     patches = []
     
-    polygon1 = Polygon(np.array(upper_points), closed = True)
+    polygon1 = Polygon(upper_pts, closed = True)
     patches.append(polygon1)
     
-    polygon2 = Polygon(np.array(lower_points), closed = True)
+    polygon2 = Polygon(lower_pts, closed = True)
     patches.append(polygon2)
     
-    # coordinates for labelling
-    center_x = x0 + L/2
-    center_y = y0 + a + h/2
-    
-    return [patches, center_x, center_y]
+    return [patches, alpha]

@@ -32,6 +32,7 @@ class BL_Element:
         self.aperture_type = "rectangular" # shape of element aperture (or vaccum chamber)
         self.apertureX = 1 # default aperture = 1m
         self.apertureY = 1 # default aperture = 1m
+        self.coil_height = 0 # default coil height
         
         
     def dipole(self, B, n, apertureY, apertureX=0, pole_face1=0, pole_face2=0, \
@@ -54,13 +55,16 @@ class BL_Element:
         
     
     
-    def set_curvature(B, p, rest_mass):
-        """ determine curvature based on particle properties to the magnet field """
-        return B * p * rest_mass
+    def set_coil_height(self, h):
+        self.coil_height = h
     
-    def set_dipole_curvature(self, p, rest_mass):
-        """ set dipole curvature based on particle properties to the magnet field """
-        self.curvature = set_curvature(self.Bfield , p, rest_mass) 
+    def set_curvature(self, B, p):
+        """ determine curvature based on particle properties to the magnet field """
+        self.curvature = B / (p/300) # assumes p in Mev/c
+        
+    def get_bending_angle(self):
+        if self.curvature == 0: warnings.warn("Magnet curvature doesn't seem to be set")
+        return self.curvature * self.length
         
     def quadrupole(self, B, a, CCT_angle = 0, nb_pts=10):
         self.element_type = "quad"
@@ -111,8 +115,6 @@ class Beamline:
         self.BL_df = pd.DataFrame([[ 0, "souce", "", BL_Element()]], \
                                   columns = ['z [m]', 'Element name', 'Element type', 'BL object'])
         
-        
-        self.elements_list = []
         
         
         

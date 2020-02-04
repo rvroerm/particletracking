@@ -13,22 +13,27 @@ import time
 import numpy as np
 from scipy.stats import norm
 from transfer_functions import EtoP
-from plot_functions import plot_beam_through_BL, BL_plot
+from plot_functions import BL_geometry, plot_beam_through_BL
 
 plt.close('all')
 
 # parameters
 input_file = "C:/TRANS/for001.dat"
-my_beamline = create_BL_from_Transport(input_file, CCT_angle = pi/6)
+my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
 
 
+
+refE = 160
+
+
+# plot beamline
+BL_geometry(my_beamline, refp=EtoP(refE))
 
 #########################################################################
 # plot beam through BL
 
-refE = 160
 
-my_beam = Beam(nb_part=1000, refE = refE, DeltaE=5, E_dist='cst',  \
+my_beam = Beam(nb_part=100, refE = refE, DeltaE=5, E_dist='cst',  \
                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
 

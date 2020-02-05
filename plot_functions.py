@@ -8,7 +8,7 @@ Created on Tue Jan 28 13:39:31 2020
 from BL_classes import Beam, Beamline, BL_Element
 from math import pi, sin, cos, tan
 import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
+from matplotlib.patches import Polygon, Rectangle
 from matplotlib.collections import PatchCollection
 #from planar import Polygon
 
@@ -77,13 +77,17 @@ def BL_plot_for_traces(BL : Beamline):
             # get coordinates in order to place the label
             pts_x = list(zip(*patches[0].get_xy()))[0]
             pts_y = list(zip(*patches[0].get_xy()))[1]
-            ax_X.text(np.average(pts_x), np.average(pts_y), element.name, \
+            
+            pos_x = (max(pts_x)+min(pts_x))/2
+            pos_y = (max(pts_y)+min(pts_y))/2
+            
+            ax_X.text(pos_x, pos_y, element.name, \
                       verticalalignment='center', horizontalalignment='center')
             
             [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZY')
             p = PatchCollection(patches, color='blue', alpha=0.6)
             ax_Y.add_collection(p)
-            ax_Y.text(np.average(pts_x), np.average(pts_y), element.name, \
+            ax_Y.text(pos_x, pos_y, element.name, \
                       verticalalignment='center', horizontalalignment='center')
             
         elif element.element_type == 'quad' :
@@ -93,16 +97,18 @@ def BL_plot_for_traces(BL : Beamline):
             # get coordinates in order to place the label
             pts_x = list(zip(*patches[0].get_xy()))[0]
             pts_y = list(zip(*patches[0].get_xy()))[1]
-            ax_X.text(np.average(pts_x), np.average(pts_y), element.name, \
-                      verticalalignment='center', horizontalalignment='center', \
-                      rotation = 90)
+            pos_x = (max(pts_x)+min(pts_x))/2
+            pos_y = (max(pts_y)+min(pts_y))/2
+            
+            ax_X.text(pos_x, pos_y, element.name, rotation = 90,
+                      verticalalignment='center', horizontalalignment='center')
             
             [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZY')
             p = PatchCollection(patches, color='red', alpha=0.6)
             ax_Y.add_collection(p)
-            ax_Y.text(np.average(pts_x), np.average(pts_y), element.name, \
-                      verticalalignment='center', horizontalalignment='center', \
-                      rotation = 90)
+            ax_Y.text(pos_x, pos_y, element.name, rotation = 90,
+                      verticalalignment='center', horizontalalignment='center')
+            
         elif element.element_type == 'slit' :
             [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='dimgray', alpha=0.8)
@@ -110,14 +116,26 @@ def BL_plot_for_traces(BL : Beamline):
             # get coordinates in order to place the label
             pts_x = list(zip(*patches[0].get_xy()))[0]
             pts_y = list(zip(*patches[0].get_xy()))[1]
-            ax_X.text(np.average(pts_x), ylim*0.8, element.name, \
+            pos_x = (max(pts_x)+min(pts_x))/2
+            ax_X.text(pos_x, ylim*0.8, element.name, \
                       verticalalignment='center', horizontalalignment='center', \
                       rotation = 90)
             
-            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZY')
-            p = PatchCollection(patches, color='dimgray', alpha=0.8)
-            ax_Y.add_collection(p) 
-            ax_Y.text(np.average(pts_x), ylim*0.8, element.name, \
+           
+        elif element.element_type == 'BPM' :
+            w = element.length
+            h = 0.15
+            BPM_shape = Rectangle(start_point-np.array([0,h/2]), width=w, height=h)
+            p = PatchCollection([BPM_shape], color='lightblue', alpha=0.8)
+            
+            ax_X.add_collection(p)
+            ax_X.text(start_point[0] + w/2, ylim*0.8, element.name, \
+                      verticalalignment='center', horizontalalignment='center', \
+                      rotation = 90)
+            
+            p = PatchCollection([BPM_shape], color='lightblue', alpha=0.8)
+            ax_Y.add_collection(p)
+            ax_Y.text(start_point[0] + w/2, ylim*0.8, element.name, \
                       verticalalignment='center', horizontalalignment='center', \
                       rotation = 90)
         
@@ -314,7 +332,7 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', \
     # segment lengths
     L_inner = L/N_segments # length of inner line - straight case
     L_outer = (L + 2 * tan(CCT_angle)*h)/N_segments # length of outer line - straight case
-    if element.curvature != 0:
+    if element.curvature != 0 and not(straigth_plot):
         # angle of section (curved elements)
         B_angle = bend_angle / N_segments
         

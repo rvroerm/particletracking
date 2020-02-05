@@ -17,6 +17,7 @@ import copy
 
 import matplotlib.pyplot as plt
 
+
     
 class BL_Element:
     """
@@ -104,6 +105,35 @@ class BL_Element:
         self.material = mat
         self.offset = offset
         self.N_segments = nb_pts
+        
+    def BPM(self):
+        self.element_type = "BPM"
+        
+    
+class Dipole(BL_Element):
+    # to be completed: move into other classes
+    
+    def __init__(self, name="", length=0, B=0, n=0, apertureY=0, apertureX=0, pole_face1=0, pole_face2=0, \
+               curvature=0, CCT_angle = 0, k1 = 0.5, k2 = 0, \
+               aperture_type = 'circular' ,nb_pts=10):
+        super().__init__(name=name, length=length)
+        self.element_type = "dipole"
+        self.Bfield = B
+        self.order = n
+        self.apertureY = apertureY
+        if apertureX == 0: self.apertureX = apertureY # unless specified, the aperture is symmetrical
+        else: self.apertureX = apertureX
+        self.aperture_type = aperture_type # rectanglar or circular
+        self.k1 = k1
+        self.k2 = k2
+        self.pole_face1 = pole_face1
+        self.pole_face2 = pole_face2
+        self.N_segments = nb_pts
+        self.curvature = curvature
+        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
+		
+		
+
         
 
 
@@ -313,7 +343,7 @@ class Particle:
                 self.z[self.it] = self.z[self.it-1] + element.length/element.N_segments
             return
         
-        if element.element_type == "drift" :            
+        if element.element_type == "drift" or element.element_type == "BPM" :            
             self.particle_through_drift(element)
             
         elif element.element_type == "dipole" :
@@ -525,11 +555,19 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
                    posL = line.find('/')
                    posR = line.rfind('/')
                    
+#                   if posL != -1 and posR != -1 :
+#                       name = line[posL+1 : posR].strip()
+#                   else: name=""
+#                   new_element = BL_Element(name = name, length = L)
+#                   
+                   
                    if posL != -1 and posR != -1 :
                        name = line[posL+1 : posR].strip()
-                   else: name = ""
-                   
-                   new_element = BL_Element(name = name, length = L)
+                       if name[0:3] == "BPM" :
+                           new_element = BL_Element(name = name, length = L)
+                           new_element.BPM()
+                       else: new_element = BL_Element(name = name, length = L)
+                   else: new_element = BL_Element(name = "", length = L)
                    
                    my_beamline.add_element(new_element)
                

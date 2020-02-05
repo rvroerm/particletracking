@@ -324,31 +324,23 @@ class Particle:
     
     def kill_lost_particle(self, element: BL_Element):
         if element.aperture_type == "rectangular":
-            if abs(self.X[self.it, 0]) > element.apertureX or abs(self.X[self.it, 2]) > element.apertureY :
+            if abs(self.get_x(self.it)) > element.apertureX or abs(self.get_y(self.it)) > element.apertureY :
                 # kill particle
                 self.X[self.it, :] = np.nan
         elif element.aperture_type == "circular":
-            if (self.X[self.it, 0])**2 + (self.X[self.it, 2])**2 > element.apertureY**2:
+            if (self.get_x(self.it))**2 + (self.get_y(self.it))**2 > element.apertureY**2:
                 # kill particle
                 self.X[self.it, :] = np.nan
     
     def particle_through_BLelement(self, element : BL_Element):
         
-        if np.isnan(self.get_dponp()) :
-            # add rows with NAN
-            
-            for i in np.arange(0, element.N_segments):
-                self.it = self.it + 1
-                self.X[self.it, :] = np.nan
-                self.z[self.it] = self.z[self.it-1] + element.length/element.N_segments
-            return
         
         if element.element_type == "drift" or element.element_type == "BPM" :            
             self.particle_through_drift(element)
             
         elif element.element_type == "dipole" :
             
-            N_segments = element.N_segments
+            N_segments = element.N_segments 
             
             B = element.Bfield
             L = element.length/N_segments
@@ -358,6 +350,8 @@ class Particle:
             apertureY = element.apertureY
             pole_face1 = element.pole_face1
             pole_face2 = element.pole_face2
+            
+            
             
             
             dipole_mat = sec_bend_matrix(L,B,n, self.get_p(), rest_mass=self.rest_mass)
@@ -371,8 +365,6 @@ class Particle:
                 self.it = self.it + 1
                 self.X[self.it, :] = np.matmul(angle_mat1, self.X[self.it - 1, :])
                 self.z[self.it] = self.z[self.it-1] 
-                
-                
             
             # insisde dipole
             for i in np.arange(0, N_segments):
@@ -511,11 +503,18 @@ class Beam:
         
         
     def size_X(self, row_nb=-1):
-        X = self.get_beam_x(row_nb)
-        (muX, sigmaX) = norm.fit(X[~np.isnan(X)])
-        return sigmaX
+        values = self.get_beam_param(param='x', row_nb=row_nb)
+        (mu, sigma) = norm.fit(values[~np.isnan(values)])
+        return sigma
     
+    def size_Y(self, row_nb=-1):
+        values = self.get_beam_param(param='y', row_nb=row_nb)
+        (mu, sigma) = norm.fit(values[~np.isnan(values)])
+        return sigma
     
+    def beam_through_BL(self, BL : Beamline()):
+        for particle in self.particle_list :
+            particle.particle_through_BL(BL)
 
 
 def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):

@@ -37,7 +37,7 @@ def plot_beam_through_BL(my_beamline: Beamline, my_beam: Beam):
     return [fig, ax_X, ax_Y]
 
 
-def BL_plot_for_traces(BL : Beamline):
+def BL_plot_for_traces(BL : Beamline, title='Beamline'):
     """ 
     Plots 1D representation or beamline elements on 2 plots: 
     ZX representation on ax_X subplot and ZY representation on ax_Y subplot
@@ -47,7 +47,7 @@ def BL_plot_for_traces(BL : Beamline):
     
     element_list = BL.BL_df['BL object'].values
     
-    fig = plt.figure('Beamline',figsize=(18, 12))
+    fig = plt.figure(title, figsize=(18, 12))
     
     # increase vertical space between plots
     fig.subplots_adjust(hspace=0.4)
@@ -184,7 +184,12 @@ def BL_geometry(BL : Beamline, refp=0):
     
     for element in element_list:
         
-        if element.element_type == 'dipole' :
+        if element.element_type == 'drift' and element.name!="" :
+            pt = start_point + np.matmul(rot_mat, [element.length , 0])
+            ax_X.plot(pt[0], pt[1] , 'o', color='black')
+            ax_X.text(pt[0], pt[1]+0.1, element.name, 
+                      verticalalignment='center', horizontalalignment='center')
+        elif element.element_type == 'dipole' :
             # get element patches and represent it on the figure
             [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation='ZX', straigth_plot = False, refp=refp)
             
@@ -218,7 +223,7 @@ def BL_geometry(BL : Beamline, refp=0):
             # get coordinates in order to place the label
             pts_x = list(zip(*patches[0].get_xy()))[0]
             pts_y = list(zip(*patches[0].get_xy()))[1]
-            ax_X.text(np.average(pts_x), max(pts_y)+0.2, element.name, 
+            ax_X.text(np.average(pts_x), max(pts_y)+0.2, element.name, \
                       verticalalignment='center', horizontalalignment='center', 
                       rotation = 90)
         
@@ -246,6 +251,7 @@ def BL_geometry(BL : Beamline, refp=0):
     ax_X.set_ylabel('height [m]')
     ax_X.set_xlim([-0.5,max_x+1]) 
     ax_X.set_ylim([-0.5,max_y+1]) 
+    ax_X.grid(which='major')
     
     return [fig]
 

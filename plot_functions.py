@@ -191,7 +191,8 @@ def BL_geometry(BL : Beamline, refp=0):
                       verticalalignment='center', horizontalalignment='center')
         elif element.element_type == 'dipole' :
             # get element patches and represent it on the figure
-            [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation='ZX', straigth_plot = False, refp=refp)
+            start_angle=rot_angle
+            [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=start_angle, orientation='ZX', straigth_plot = False, refp=refp)
             
             p = PatchCollection(patches, color='blue', alpha=0.6)
             ax_X.add_collection(p)
@@ -199,7 +200,11 @@ def BL_geometry(BL : Beamline, refp=0):
             # get coordinates in order to place the label
             pts_x = list(zip(*patches[0].get_xy()))[0]
             pts_y = list(zip(*patches[0].get_xy()))[1]
-            ax_X.text(np.average(pts_x), np.average(pts_y)+0.2, element.name, 
+            # get angle at the middle of the magnet to put the label at the good position
+            half_angle = (start_angle + rot_angle)/2
+            text_rot_mat = [[cos(half_angle),-sin(half_angle)],[sin(half_angle),cos(half_angle)]]
+            text_offset = np.matmul(text_rot_mat, [0.,0.3]) # vertical offset for text, rotated if needed
+            ax_X.text(np.average(pts_x) + text_offset[0], np.average(pts_y)+text_offset[1], element.name, 
                       verticalalignment='center', horizontalalignment='center')
             
             
@@ -211,7 +216,8 @@ def BL_geometry(BL : Beamline, refp=0):
             # get coordinates in order to place the label
             pts_x = list(zip(*patches[0].get_xy()))[0]
             pts_y = list(zip(*patches[0].get_xy()))[1]
-            ax_X.text(np.average(pts_x), max(pts_y)+0.2, element.name, 
+            text_offset = np.matmul(rot_mat, [0,0.3]) # vertical offset for text, rotated if needed
+            ax_X.text(np.average(pts_x) + text_offset[0], np.average(pts_y)+text_offset[1], element.name, 
                       verticalalignment='center', horizontalalignment='center', 
                       rotation = 90)
             
@@ -223,7 +229,8 @@ def BL_geometry(BL : Beamline, refp=0):
             # get coordinates in order to place the label
             pts_x = list(zip(*patches[0].get_xy()))[0]
             pts_y = list(zip(*patches[0].get_xy()))[1]
-            ax_X.text(np.average(pts_x), max(pts_y)+0.2, element.name, \
+            text_offset = np.matmul(rot_mat, [0,0.3]) # vertical offset for text, rotated if needed
+            ax_X.text(np.average(pts_x) + text_offset[0], np.average(pts_y)+text_offset[1], element.name, \
                       verticalalignment='center', horizontalalignment='center', 
                       rotation = 90)
         

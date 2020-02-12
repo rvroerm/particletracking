@@ -15,6 +15,7 @@ from scipy.stats import norm
 from transfer_functions import EtoP
 from plot_functions import BL_geometry, plot_beam_through_BL, BL_plot_for_traces
 
+import pandas as pd
 
 t0 = time.time()
 
@@ -36,7 +37,7 @@ BL_geometry(my_beamline, refp=EtoP(refE))
 # plot beam through BL
 
 
-my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='cst',  \
+my_beam = Beam(nb_part=100, refE = refE, DeltaE=5, E_dist='cst',  \
                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
 
@@ -106,56 +107,76 @@ plt.ylabel('nb of protons (arb. units)')
 ###############################################################################
 # tune BL element
 
-my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
+variation_study = True
 
-[fig, ax_X, ax_Y] = BL_plot_for_traces(my_beamline, title='variation study 1 particle')
+varaiation_df = pd.DataFrame(columns = ['magnet','factor','size X','size Y'])
 
-element_to_tune = "Q5Y"
-plt.suptitle("Tuning of %s"%element_to_tune)
-
-index = my_beamline.get_element_index(element_to_tune)
-ref_field = my_beamline.BL_df.loc[index,'BL object'].Bfield
-tune_range = [0.9, 0.95, 0.99, 1, 1.01, 1.05, 1.1]
-#tune_range = [0.97, 0.98, 0.99, 1, 1.01, 1.02, 1.03]
-
-for B_factor in tune_range:
+if variation_study:
     
-    ##############################
-    # 1. case of 1 particle at ref E
+    print('\n')
     
-    my_proton = Particle(z=0, x=0, y=0, divX=0.025, divY=0.025, p=570.75, refp=570.75, max_it=1000)
+    my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
     
-    # change field
-    my_beamline.BL_df.loc[index,'BL object'].Bfield = ref_field  * B_factor
+    elements_to_tune = ["Q1Q","Q2Q","Q3Q","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
+    #elements_to_tune = ["Q4X","Q5Y"]
     
+    tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
+    #tune_range = [0.8, 0.9, 0.95, 1, 1.05, 1.1, 1.2]
     
-    my_proton.particle_through_BL(my_beamline)
+    for element_to_tune in elements_to_tune:
+        print("Element: %s"%element_to_tune)
+        
+        # get element from beamline
+        index = my_beamline.get_element_index(element_to_tune)
+        ref_field = my_beamline.BL_df.loc[index,'BL object'].Bfield
+        
+        [fig, ax_X, ax_Y] = BL_plot_for_traces(my_beamline, title='variation study 1 particle, element %s'%element_to_tune)
+        plt.suptitle("Tuning of %s"%element_to_tune)
+        
+        for B_factor in tune_range:
+            
+            ##############################
+            # 1. case of 1 particle at ref E
+            
+            my_proton = Particle(z=0, x=0, y=0, divX=0.025, divY=0.025, p=570.75, refp=570.75, max_it=1000)
+            
+            # change field
+            my_beamline.BL_df.loc[index,'BL object'].Bfield = ref_field  * B_factor
+            
+            
+            my_proton.particle_through_BL(my_beamline)
+            
+            ax_X.plot(my_proton.z[0:my_proton.it], my_proton.X[0:my_proton.it,0])
+            ax_Y.plot(my_proton.z[0:my_proton.it], my_proton.X[0:my_proton.it,2])
+            
+            
+            ##############################
+            # 2. case of a full beam
+            
+            my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='cst',  \
+                               DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+                               DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
+            
+            my_beam.beam_through_BL(my_beamline)
+            sigma_X = my_beam.size_X(row_nb = p_ISO_index)
+            sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
+            print('B_factor = %0.2f : sigma_X = %0.2f and sigma_Y = %0.2f '%(B_factor, sigma_X*1000, sigma_Y*1000))
+            
+            
+            new_line = pd.DataFrame.from_dict({'magnet' : [element_to_tune], 
+                                               'factor' : [B_factor], 
+                                               'size X' : [sigma_X*1000], 
+                                               'size Y': [sigma_Y*1000]})
+            varaiation_df = varaiation_df.append(new_line, ignore_index=True)
+        
     
-    ax_X.plot(my_proton.z[0:my_proton.it], my_proton.X[0:my_proton.it,0])
-    ax_Y.plot(my_proton.z[0:my_proton.it], my_proton.X[0:my_proton.it,2])
+        # reset field    
+        my_beamline.BL_df.loc[index,'BL object'].Bfield = ref_field    
+        
+        ax_X.legend([(element_to_tune + " = " + str(round(x*ref_field,3))) for x in tune_range], loc="upper right")
+        ax_Y.legend([(element_to_tune + " = " + str(round(x*ref_field,3))) for x in tune_range], loc="upper right") 
     
-    
-    ##############################
-    # 2. case of a full beam
-    
-    my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='cst',  \
-                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
-                       DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
-    
-    my_beam.beam_through_BL(my_beamline)
-    sigma_X = my_beam.size_X(row_nb = p_ISO_index)
-    sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
-    print('B_factor = %0.2f : sigma_X = %0.2f and sigma_Y = %0.2f '%(B_factor, sigma_X*1000, sigma_Y*1000))
-    
-    
-
-# reset field    
-my_beamline.BL_df.loc[index,'BL object'].Bfield = ref_field    
-    
-ax_X.legend([(element_to_tune + " = " + str(round(x*ref_field,3))) for x in tune_range], loc="upper right")
-ax_Y.legend([(element_to_tune + " = " + str(round(x*ref_field,3))) for x in tune_range], loc="upper right") 
-
-
+        print('\n')
 
 
     

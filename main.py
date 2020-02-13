@@ -107,9 +107,9 @@ plt.ylabel('nb of protons (arb. units)')
 ###############################################################################
 # tune BL element
 
-variation_study = True
+variation_study = False
 
-varaiation_df = pd.DataFrame(columns = ['magnet','factor','size X','size Y'])
+varaiation_df = pd.DataFrame(columns = ['magnet','factor','size X','size Y','BL eff'])
 
 if variation_study:
     
@@ -117,7 +117,7 @@ if variation_study:
     
     my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
     
-    elements_to_tune = ["Q1Q","Q2Q","Q3Q","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
+    elements_to_tune = ["Q1C","Q2C","Q3C","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
     #elements_to_tune = ["Q4X","Q5Y"]
     
     tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
@@ -160,23 +160,109 @@ if variation_study:
             my_beam.beam_through_BL(my_beamline)
             sigma_X = my_beam.size_X(row_nb = p_ISO_index)
             sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
-            print('B_factor = %0.2f : sigma_X = %0.2f and sigma_Y = %0.2f '%(B_factor, sigma_X*1000, sigma_Y*1000))
+            
+            # efficiency
+            X = my_beam.get_beam_param(param='x', row_nb=p_ISO_index)
+            
+            efficiency = len(X[~np.isnan(X)]) / len(X)
+            print('B_factor = %0.2f : sigma_X = %0.2f , sigma_Y = %0.2f , efficiency = %.1f %% '%(B_factor, sigma_X*1000, sigma_Y*1000, efficiency*100))
             
             
             new_line = pd.DataFrame.from_dict({'magnet' : [element_to_tune], 
                                                'factor' : [B_factor], 
                                                'size X' : [sigma_X*1000], 
-                                               'size Y': [sigma_Y*1000]})
+                                               'size Y': [sigma_Y*1000],
+                                               'BL eff': [efficiency]})
             varaiation_df = varaiation_df.append(new_line, ignore_index=True)
-        
+            
+            
     
         # reset field    
         my_beamline.BL_df.loc[index,'BL object'].Bfield = ref_field    
         
         ax_X.legend([(element_to_tune + " = " + str(round(x*ref_field,3))) for x in tune_range], loc="upper right")
-        ax_Y.legend([(element_to_tune + " = " + str(round(x*ref_field,3))) for x in tune_range], loc="upper right") 
+        ax_Y.legend([(element_to_tune + " = " + str(round(x*ref_field,3))) for x in tune_range], loc="upper right")
     
         print('\n')
+
+###############################################################################
+# correcting magnet variation
+
+variation_study = True
+
+if variation_study:
+    
+    
+    
+    my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
+    
+    #elements_to_tune = ["Q1C","Q2C","Q3C","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
+    elements_to_correct = ["Q2C"]
+    error_range = [0.99]
+    
+    elements_to_tune = ["Q4X"]
+    
+    #tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
+    #tune_range = [0.5, 0.75, 0.9, 0.95, 1, 1.05, 1.1, 1.25, 1.5]
+    tune_range = [0.95, 1, 1.05, 1.1,1.15]
+    
+    for element_to_correct in elements_to_correct:
+        
+        print('\n')
+        
+        print("Element to correct: %s"%element_to_correct)
+        
+        # get element from beamline
+        index1 = my_beamline.get_element_index(element_to_correct)
+        
+        ref_field1 = my_beamline.BL_df.loc[index1,'BL object'].Bfield
+        
+        for error_on_magnet in error_range:
+        
+            my_beamline.BL_df.loc[index1,'BL object'].Bfield = ref_field1  * error_on_magnet
+            print('%s = %0.2f'%(element_to_correct, ref_field1  * error_on_magnet))
+            
+            for element_to_tune in elements_to_tune:
+                print("Element: %s"%element_to_tune)
+                
+                # get element from beamline
+                index = my_beamline.get_element_index(element_to_tune)
+                ref_field = my_beamline.BL_df.loc[index,'BL object'].Bfield
+                
+                
+                for B_factor in tune_range:
+                    
+                    # change field
+                    my_beamline.BL_df.loc[index,'BL object'].Bfield = ref_field  * B_factor
+                    
+                    
+                    # case of a full beam
+                    
+                    my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='cst',  \
+                                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+                                       DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
+                    
+                    my_beam.beam_through_BL(my_beamline)
+                    sigma_X = my_beam.size_X(row_nb = p_ISO_index)
+                    sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
+                    
+                    # efficiency
+                    X = my_beam.get_beam_param(param='x', row_nb=p_ISO_index)
+                    
+                    efficiency = len(X[~np.isnan(X)]) / len(X)
+                    print('B_factor = %0.2f : sigma_X = %0.2f , sigma_Y = %0.2f , efficiency = %.1f %% '%(B_factor, sigma_X*1000, sigma_Y*1000, efficiency*100))
+                
+                
+                
+        
+                # reset field    
+                my_beamline.BL_df.loc[index,'BL object'].Bfield = ref_field    
+            
+        
+        # reset field    
+        my_beamline.BL_df.loc[index1,'BL object'].Bfield = ref_field1      
+        
+    print('\n')
 
 
     

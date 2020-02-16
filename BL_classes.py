@@ -178,7 +178,16 @@ class Beamline:
         # out of loop --> element not found
         raise Exception("Element %s is not present in beamline"%element_name)
     
+    def get_total_segments(self):
+        N = 1
+        for index, row in self.BL_df.iterrows(): # loop all elements into BL
+            
+            N = N + row['BL object'].N_segments
+            if row['BL object'].element_type == 'dipole':
+                N = N + 2 # add 2 segements for the pole faces
         
+        return N
+
 
 class Particle:
         
@@ -413,6 +422,9 @@ class Particle:
             
     def particle_through_BL(self, BL : Beamline()):
         
+        if len(self.z) < BL.get_total_segments() :
+            raise Exception("Beamline requires bigger length for particle set: increase max_it")
+            
         for index, row in BL.BL_df.iterrows(): # loop all elements into BL
             #print(" \n  BL element: %s (%s) ; z =  %.2e"%(row['Element name'],row['Element type'],BL.get_z(index)))
             

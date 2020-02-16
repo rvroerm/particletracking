@@ -107,7 +107,7 @@ plt.ylabel('nb of protons (arb. units)')
 ###############################################################################
 # tune BL element
 
-variation_study = True
+variation_study = False
 
 varaiation_df = pd.DataFrame(columns = ['magnet','factor','size X','size Y'])
 
@@ -117,7 +117,7 @@ if variation_study:
     
     my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
     
-    elements_to_tune = ["Q1Q","Q2Q","Q3Q","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
+    elements_to_tune = ["Q1C","Q2C","Q3C","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
     #elements_to_tune = ["Q4X","Q5Y"]
     
     tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]

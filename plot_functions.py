@@ -110,17 +110,30 @@ def BL_plot_for_traces(BL : Beamline, title='Beamline'):
                       verticalalignment='center', horizontalalignment='center')
             
         elif element.element_type == 'slit' :
-            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZX')
-            p = PatchCollection(patches, color='dimgray', alpha=0.8)
-            ax_X.add_collection(p)
-            # get coordinates in order to place the label
-            pts_x = list(zip(*patches[0].get_xy()))[0]
-            pts_y = list(zip(*patches[0].get_xy()))[1]
-            pos_x = (max(pts_x)+min(pts_x))/2
-            ax_X.text(pos_x, ylim*0.8, element.name, \
-                      verticalalignment='center', horizontalalignment='center', \
-                      rotation = 90)
             
+            if element.orientation == 'X':
+                [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZX')
+                p = PatchCollection(patches, color='dimgray', alpha=0.8)
+                ax_X.add_collection(p)
+                # get coordinates in order to place the label
+                pts_x = list(zip(*patches[0].get_xy()))[0]
+                pts_y = list(zip(*patches[0].get_xy()))[1]
+                pos_x = (max(pts_x)+min(pts_x))/2
+                ax_X.text(pos_x, ylim*0.8, element.name, \
+                          verticalalignment='center', horizontalalignment='center', \
+                          rotation = 90)
+                
+            elif element.orientation == 'Y':
+                [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZY')
+                p = PatchCollection(patches, color='dimgray', alpha=0.8)
+                ax_Y.add_collection(p)
+                # get coordinates in order to place the label
+                pts_x = list(zip(*patches[0].get_xy()))[0]
+                pts_y = list(zip(*patches[0].get_xy()))[1]
+                pos_x = (max(pts_x)+min(pts_x))/2
+                ax_Y.text(pos_x, ylim*0.8, element.name, \
+                          verticalalignment='center', horizontalalignment='center', \
+                          rotation = 90)
            
         elif element.element_type == 'BPM' :
             w = element.length
@@ -223,7 +236,8 @@ def BL_geometry(BL : Beamline, refp=0):
             
         elif element.element_type == 'slit' :
             # get element patches and represent it on the figure
-            [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation='ZX', straigth_plot = False)
+            orientation = 'Z' + element.orientation # returns ZX or ZY
+            [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation=orientation, straigth_plot = False)
             p = PatchCollection(patches, color='dimgray', alpha=0.8)
             ax_X.add_collection(p)   
             # get coordinates in order to place the label

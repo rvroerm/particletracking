@@ -440,6 +440,9 @@ def quad_matrix(L,B,a,p,rest_mass=938):
     L =length, B=field, a=aperture
     """
     
+    if B==0:
+        return drift_matrix(L, p, rest_mass=rest_mass)
+    
     gamma = PtoGamma(p,rest_mass)
     
     Brho  = PtoBrho(p)
@@ -536,6 +539,10 @@ def sextupole(L,B,a,alpha,beam,it_z,refE,N_segments = 10):
 
 
 def sec_bend_matrix(L,B,n,p,rest_mass=938):
+    
+    
+    if B==0:
+        return drift_matrix(L, p, rest_mass=rest_mass)
     
     Brho  = PtoBrho(p)
     h = B/Brho

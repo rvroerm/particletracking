@@ -641,16 +641,19 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
                    new_element.quadrupole(B=B, a=a, CCT_angle = CCT_angle)
                    my_beamline.add_element(new_element)
                    
-               elif data[0][0:5] == '(slit':
+               elif data[0][0:5] == '(slit' or data[0][0:6] == '(slitX' or data[0][0:6] == '(slitY':
                    # slit
+                   oritentation = 'X'
+                   if data[0][0:6] == '(slitY':
+                       oritentation = 'Y'
                    
                    L = float(data[1].replace(";","") )
-                   leftX = float(data[2].replace(";","") )
-                   rightX = float(data[3].replace(";","") )
+                   left = float(data[2].replace(";","") )
+                   right = float(data[3].replace(";","") )
                    mat = data[4].replace(";","") 
                    
-                   opening = rightX - leftX
-                   offset = rightX + leftX
+                   opening = right - left
+                   offset = right + left
                    
                    # check if there is a name
                    posL = line.find('/')
@@ -662,7 +665,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
                    
                    
                    new_element = BL_Element(name = name, length = L)
-                   new_element.slit(opening, orientation='X', mat = mat, offset = offset, nb_pts=20)
+                   new_element.slit(opening, orientation=oritentation, mat = mat, offset = offset, nb_pts=20)
                    my_beamline.add_element(new_element)
                    
                    line = fp.readline() # skip next drift

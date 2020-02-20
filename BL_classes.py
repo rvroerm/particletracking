@@ -529,7 +529,7 @@ class Beam:
             particle.particle_through_BL(BL)
 
 
-def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
+def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, apertureX=0):
     """
     opens a transport file and creates the corresponding Beamline object
     """
@@ -565,16 +565,10 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
                    # check if there is a name
                    posL = line.find('/')
                    posR = line.rfind('/')
-                   
-#                   if posL != -1 and posR != -1 :
-#                       name = line[posL+1 : posR].strip()
-#                   else: name=""
-#                   new_element = BL_Element(name = name, length = L)
-#                   
-                   
-                   if posL != -1 and posR != -1 :
+                   if posL != -1 and posR != -1 : # name found
                        name = line[posL+1 : posR].strip()
-                       if name[0:3] == "BPM" :
+                       if name[0:3] == "BPM" or name[0:2] == "IC" :
+                           # dosimetry element (BPM)
                            new_element = BL_Element(name = name, length = L)
                            new_element.BPM()
                        else: new_element = BL_Element(name = name, length = L)
@@ -592,8 +586,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
                     # check if there is a name
                    posL = line.find('/')
                    posR = line.rfind('/')
-                   
-                   if posL != -1 and posR != -1 :
+                   if posL != -1 and posR != -1 : # name found
                        name = line[posL+1 : posR].strip()
                    else: name = ""
                    
@@ -614,11 +607,16 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0):
                            angle_out = float(data_prev[1].replace(";","") )
                        else:
                            fp.seek(last_pos) # go back, exit face not defined
-                       
-                  
+                   
+                   # set horizontal aperture of the dipole
+                   if apertureX!=0: horizontal_aperture = apertureX #value was given in input
+                   elif CCT_angle!=0 : horizontal_aperture = 0 # CCT magnet --> symmetric aperture
+                   else: horizontal_aperture = 0.05 # default value = 5cm (x2)
+                   
                    
                    new_element = BL_Element(name = name, length = L)
-                   new_element.dipole(B=B, n=n, apertureY=vertical_aperture, \
+                   new_element.dipole(B=B, n=n, \
+                                      apertureX=horizontal_aperture, apertureY=vertical_aperture, \
                                       pole_face1=angle_in, pole_face2=angle_out,\
                                       CCT_angle = CCT_angle)
                    my_beamline.add_element(new_element)

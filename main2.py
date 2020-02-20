@@ -186,7 +186,7 @@ if variation_study:
 ###############################################################################
 # correcting magnet variation
 
-variation_study = True
+variation_study = False
 
 if variation_study:
     

@@ -25,7 +25,7 @@ my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
 
 
 
-refE = 160
+refE = 150
 
 
 # plot beamline

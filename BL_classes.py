@@ -609,14 +609,21 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                            fp.seek(last_pos) # go back, exit face not defined
                    
                    # set horizontal aperture of the dipole
-                   if apertureX!=0: horizontal_aperture = apertureX #value was given in input
-                   elif CCT_angle!=0 : horizontal_aperture = 0 # CCT magnet --> symmetric aperture
-                   else: horizontal_aperture = 0.05 # default value = 5cm (x2)
+                   if apertureX!=0: #value was given in input
+                       horizontal_aperture = apertureX 
+                       aperture_type = "rectangular"
+                   elif CCT_angle!=0 : # CCT magnet --> symmetric aperture
+                       horizontal_aperture = 0 
+                       aperture_type = "circular"
+                   else: # default value = 5cm (x2)
+                       horizontal_aperture = 0.05 
+                       aperture_type = "rectangular"
                    
                    
                    new_element = BL_Element(name = name, length = L)
                    new_element.dipole(B=B, n=n, \
                                       apertureX=horizontal_aperture, apertureY=vertical_aperture, \
+                                      aperture_type = aperture_type, \
                                       pole_face1=angle_in, pole_face2=angle_out,\
                                       CCT_angle = CCT_angle)
                    my_beamline.add_element(new_element)

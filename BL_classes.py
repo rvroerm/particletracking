@@ -435,8 +435,8 @@ class Particle:
 class Beam:
     
     def __init__(self, nb_part=1000, \
-                       refE = 160, DeltaE=0, E_dist='cst',  \
-                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+                       refE = 160, DeltaE=0, E_dist='uniform',  \
+                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform', \
                        particle_type='proton'):
         
@@ -445,37 +445,47 @@ class Beam:
         
         for i in range(0,nb_part):
             # initialize particle properties
-            if size_dist =='uniform':
-                sizeX = DeltaX*np.random.uniform(-1,1)
-                sizeY = DeltaY*np.random.uniform(-1,1)
+            if size_dist =='cst':
+                sizeX = DeltaX
+                sizeY = DeltaY
             elif size_dist == 'normal':
                 sizeX = DeltaX*np.random.normal(0,1)
                 sizeY = DeltaY*np.random.normal(0,1)
-            elif size_dist == 'cst':
+            elif size_dist == 'uniform':
+                sizeX = DeltaX*np.random.uniform(-1,1)
+                sizeY = DeltaY*np.random.uniform(-1,1)
+            elif size_dist == 'uniform2': 
+                #uniform distribution without randomness (to use on 1 variable max)
                 sizeX = DeltaX*(i-nb_part/2)/nb_part*2
                 sizeY = DeltaY*(i-nb_part/2)/nb_part*2
             else:
                 raise Exception('Distribution chosen for "size_dist" is not valid')
             
             
-            if div_dist =='uniform' :
-                divX = DeltaDivX*np.random.uniform(-1,1)
-                divY = DeltaDivY*np.random.uniform(-1,1)
+            if div_dist =='cst' :
+                divX = DeltaDivX
+                divY = DeltaDivY
             elif div_dist == 'normal':
                 divX = DeltaDivX*np.random.normal(0,1)
                 divY = DeltaDivY*np.random.normal(0,1)
-            elif div_dist == 'cst':
+            elif div_dist == 'uniform':
+                divX = DeltaDivX*np.random.uniform(-1,1)
+                divY = DeltaDivY*np.random.uniform(-1,1)
+            elif div_dist == 'uniform2': 
+                #uniform distribution without randomness (to use on 1 variable max)
                 divX = DeltaDivX*(i-nb_part/2)/nb_part*2
                 divY = DeltaDivY*(i-nb_part/2)/nb_part*2
             else:
                 raise Exception('Distribution chosen for "div_dist" is not valid')
                 
              
-            if E_dist == 'uniform' :
-                E = refE + DeltaE*np.random.uniform(-1,1)
+            if E_dist == 'cst' :
+                E = refE + DeltaE
             elif E_dist == 'normal':
                 E = refE + DeltaE*np.random.normal(0,1)
-            elif E_dist == 'cst':
+            elif E_dist == 'uniform':
+                E = refE + DeltaE*np.random.uniform(-1,1)
+            elif E_dist == 'uniform2':
                 E = refE + DeltaE*(i-nb_part/2)/nb_part*2
             else:
                 raise Exception('Distribution chosen for "E_dist" is not valid')

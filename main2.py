@@ -25,7 +25,7 @@ my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
 
 
 
-refE = 150
+refE = 160
 
 
 # plot beamline
@@ -35,8 +35,8 @@ BL_geometry(my_beamline, refp=EtoP(refE))
 # plot beam through BL
 
 
-my_beam = Beam(nb_part=1000, refE = refE, DeltaE=1.5, E_dist='cst',  \
-                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+my_beam = Beam(nb_part=1000, refE = refE, DeltaE=-10, E_dist='cst',  \
+                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
 
 

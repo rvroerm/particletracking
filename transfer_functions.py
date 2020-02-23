@@ -1007,6 +1007,14 @@ def Highland(L_m,mat,beam_in,refE):
             Lrad = 13.84
             density = 7.874
             cWET = 0.4349
+        elif mat == 'lead':
+            Lrad = 7.39
+            density = 8.3
+            cWET = 0.675
+        elif mat == 'aluminum' or mat == 'aluminium ':
+            Lrad = 24.01
+            density = 2.7 
+            cWET = 0.778
         else:
             raise Exception('material not found')
         

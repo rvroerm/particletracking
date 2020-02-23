@@ -34,27 +34,7 @@ class BL_Element:
         self.apertureX = 1 # default aperture = 1m
         self.apertureY = 1 # default aperture = 1m
         self.coil_height = 0 # default coil height
-        
-        
-    def dipole(self, B, n, apertureY, apertureX=0, pole_face1=0, pole_face2=0, \
-               curvature=0, CCT_angle = 0, k1 = 0.5, k2 = 0, \
-               aperture_type = 'circular' ,nb_pts=10):
-        self.element_type = "dipole"
-        self.Bfield = B
-        self.order = n
-        self.apertureY = apertureY
-        if apertureX == 0: self.apertureX = apertureY # unless specified, the aperture is symmetrical
-        else: self.apertureX = apertureX
-        self.aperture_type = aperture_type # rectanglar or circular
-        self.k1 = k1
-        self.k2 = k2
-        self.pole_face1 = pole_face1
-        self.pole_face2 = pole_face2
-        self.N_segments = nb_pts
-        self.curvature = curvature
-        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
-        
-    
+     
     
     def set_coil_height(self, h):
         self.coil_height = h
@@ -66,48 +46,7 @@ class BL_Element:
     def get_bending_angle(self):
         if self.curvature == 0: warnings.warn("Magnet curvature doesn't seem to be set")
         return self.curvature * self.length
-        
-    def quadrupole(self, B, a, CCT_angle = 0, nb_pts=10):
-        self.element_type = "quad"
-        self.Bfield = B
-        self.apertureX = a
-        self.apertureY = a
-        self.aperture_type = "circular"
-        self.N_segments = nb_pts
-        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
-        
-    def sextupole(self, B, a, CCT_angle = 0, nb_pts=10):
-        self.element_type = "sext"
-        self.Bfield = B
-        self.apertureX = a
-        self.apertureY = a
-        self.aperture_type = "circular"
-        self.N_segments = nb_pts
-        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
-        
-    def solenoid(self, B, a, nb_pts=20):
-        self.element_type = "solenoid"
-        self.Bfield = B
-        self.apertureX = a
-        self.apertureY = a
-        self.aperture_type = "circular"
-        self.N_segments = nb_pts
-        
-    def slit(self, gap, orientation='X', mat ='tantalum', offset = 0, nb_pts=20):
-        self.element_type = "slit"
-        
-        if orientation == 'X':
-            self.apertureX = gap/2
-        elif orientation == 'Y':
-            self.apertureY = gap/2
-            
-        self.orientation = orientation
-        self.material = mat
-        self.offset = offset
-        self.N_segments = nb_pts
-        
-    def BPM(self):
-        self.element_type = "BPM"
+    
         
     
 class Dipole(BL_Element):
@@ -133,9 +72,72 @@ class Dipole(BL_Element):
         self.CCT_angle = CCT_angle # angle of the windings in the CCT case
 		
 		
-
+class Quadrupole(BL_Element):
+    
+    def __init__(self, name="", length=0, B=0, a=0, CCT_angle = 0, \
+               aperture_type = 'circular' ,nb_pts=10):
+        super().__init__(name=name, length=length)
+        self.element_type = "quad"
+        self.Bfield = B
+        self.apertureY = a
+        self.apertureX = a
+        self.aperture_type = aperture_type
+        self.N_segments = nb_pts
+        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
         
+class Sextupole(BL_Element):
+    
+    def __init__(self, name="", length=0, B=0, a=0, CCT_angle = 0, \
+               aperture_type = 'circular' ,nb_pts=10):
+        super().__init__(name=name, length=length)
+        self.element_type = "sext"
+        self.Bfield = B
+        self.apertureY = a
+        self.apertureX = a
+        self.aperture_type = aperture_type
+        self.N_segments = nb_pts
+        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
 
+
+
+class Solenoid(BL_Element):
+    
+    def __init__(self, name="", length=0, B=0, a=0, CCT_angle = 0, \
+               aperture_type = 'circular' ,nb_pts=20):
+        super().__init__(name=name, length=length)
+        self.element_type = "solenoid"
+        self.Bfield = B
+        self.apertureY = a
+        self.apertureX = a
+        self.aperture_type = aperture_type
+        self.N_segments = nb_pts
+        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
+        
+        
+class Slit(BL_Element):
+    
+    def __init__(self, gap=0, name="", length=0, orientation='X', mat ='lead', offset = 0, nb_pts=20):
+        
+        super().__init__(name=name, length=length)
+        self.element_type = "slit"
+        
+        if orientation == 'X':
+            self.apertureX = gap/2
+        elif orientation == 'Y':
+            self.apertureY = gap/2
+        self.orientation = orientation
+        self.material = mat
+        self.offset = offset
+        self.N_segments = nb_pts
+        
+class BPM(BL_Element):
+    
+    def __init__(self, name="", length=0):
+        super().__init__(name=name, length=length)
+        self.element_type = "BPM"
+        
+        
+##############################################################################        
 
 class Beamline:
     
@@ -187,6 +189,10 @@ class Beamline:
                 N = N + 2 # add 2 segements for the pole faces
         
         return N
+
+
+
+###############################################################################
 
 
 class Particle:
@@ -432,6 +438,9 @@ class Particle:
             #print(self.get_z())
 
 
+
+###############################################################################
+
 class Beam:
     
     def __init__(self, nb_part=1000, \
@@ -539,6 +548,10 @@ class Beam:
             particle.particle_through_BL(BL)
 
 
+
+
+###############################################################################
+
 def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, apertureX=0):
     """
     opens a transport file and creates the corresponding Beamline object
@@ -579,8 +592,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                        name = line[posL+1 : posR].strip()
                        if name[0:3] == "BPM" or name[0:2] == "IC" :
                            # dosimetry element (BPM)
-                           new_element = BL_Element(name = name, length = L)
-                           new_element.BPM()
+                           new_element = BPM(name = name, length = L)
                        else: new_element = BL_Element(name = name, length = L)
                    else: new_element = BL_Element(name = "", length = L)
                    
@@ -630,12 +642,12 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                        aperture_type = "rectangular"
                    
                    
-                   new_element = BL_Element(name = name, length = L)
-                   new_element.dipole(B=B, n=n, \
+                   new_element = Dipole(name = name, length = L, B=B, n=n, \
                                       apertureX=horizontal_aperture, apertureY=vertical_aperture, \
                                       aperture_type = aperture_type, \
                                       pole_face1=angle_in, pole_face2=angle_out,\
                                       CCT_angle = CCT_angle)
+                       
                    my_beamline.add_element(new_element)
                 
                elif data[0][0:2] == "5.":
@@ -652,8 +664,8 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                        name = line[posL+1 : posR].strip()
                    else: name = ""
                    
-                   new_element = BL_Element(name = name, length = L)
-                   new_element.quadrupole(B=B, a=a, CCT_angle = CCT_angle)
+                   new_element = Quadrupole(name = name, length = L, B=B, a=a, CCT_angle = CCT_angle)
+                   
                    my_beamline.add_element(new_element)
                    
                elif data[0][0:5] == '(slit' or data[0][0:6] == '(slitX' or data[0][0:6] == '(slitY':
@@ -678,9 +690,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                        name = line[posL+1 : posR].strip()
                    else: name = ""
                    
-                   
-                   new_element = BL_Element(name = name, length = L)
-                   new_element.slit(opening, orientation=oritentation, mat = mat, offset = offset, nb_pts=20)
+                   new_element = Slit(name = name, length = L, gap=opening, orientation=oritentation, mat = mat, offset = offset, nb_pts=20)
                    my_beamline.add_element(new_element)
                    
                    line = fp.readline() # skip next drift

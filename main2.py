@@ -35,7 +35,7 @@ BL_geometry(my_beamline, refp=EtoP(refE))
 # plot beam through BL
 
 
-my_beam = Beam(nb_part=1000, refE = refE, DeltaE=-10, E_dist='cst',  \
+my_beam = Beam(nb_part=10, refE = refE, DeltaE=5, E_dist='normal',  \
                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
 
@@ -58,9 +58,7 @@ z_ISO = my_beamline.BL_df.loc[index,'z [m]']
 
 p_ISO_index = my_beam.particle_list[0].get_z_index(z_ISO)
 
-print(index)
-print(p_ISO_index)
-print("z = ",my_beam.get_beam_param(param='z', row_nb=p_ISO_index)[0])
+print("z ISO = ",my_beam.get_beam_param(param='z', row_nb=p_ISO_index)[0])
 
 #X = my_beam.get_beam_x(p_ISO_index)
 

@@ -1,16 +1,16 @@
    /* (Size = 10um, half-divergence=45mrad, time sigma=10ps~0.012cm, dponp=0, E=160MeV) */
-   1. 0.01 45. 0.01 45. 0.012 0. 570.75 /BEAM/ ;
+   1. 0.01 45. 0.01 45. 0.012 0. 565.75 /BEAM/ ;
    
    
    3. 0.11 ; (space between target and fisrt element)
    
-   5. 0.15 -0.96704 15 /Q1Q/ ;
+   5. 0.15 -0.96704 15 /Q1C/ ;
    
    3. 0.15 ;
    
    
    -10.2 1. 1. 30. 0.01;
-   5. 0.33 0.99 40 /Q2Q/ ;
+   5. 0.33 0.99 40 /Q2C/ ;
    -10.2 1. 1. 30. 0.01;
    
    3. 0.2 ; 
@@ -18,59 +18,59 @@
    -10.2 1. 1. 30. 0.01; 
    -10.2 3. 3. 40. 0.01; 
    
-   5. 0.33 -0.583 40 /Q3Q/ ;
+   5. 0.33 -0.583 40 /Q3C/ ;
    
    -10.2 3. 3. 40. 0.01;
    
-   3. 0.7 ;
+   3. 0.3 ;
+   
+   5. 0.15 -0.1 30 /Q4C/ ;
+   
+   3. 0.2;
    
    3. 0.05 /BPM1/ ;
    
-   3. 0.15 ;
+   3. 0.05 ;
+   
+   (slit 0.1 -.025 .025 aluminum ;  ) 
+   3. 0.1  ;
+   
+   3. 0.05 ;
    
    10.2 1. 1. 5. 0.01;
    10.2 3. 3. 5. 0.01; 
-   5. 0.25 0.345 20 /Q4X/ ;
+   5.01 0.15 0.99 30 /Q4X/ ;
    
-   3. 0.5 ; 
+   3. 0.35 ; 
    
    3. 0.05 /BPM2/ ;
    
-   3. 0.15 ;
+   3. 0.05 ;
+   
+   (slitY 0.1 -.025 .025 aluminum ;  ) 
+   3. 0.1  ;
+   
+   3. 0.05 ;
    
    10.2 1. 1. 5. 0.01;
    10.2 3. 3. 5. 0.01;
-   5. 0.25 -0.185 20 /Q5Y/ ;
+   5.01 0.15 -0.74 30 /Q5Y/ ;
    
    
    
    3. 0.1 /GTR/;
    
-   3. 0.2 ;
+   3. 0.15 ;
    
-   -10. 2. 2. 0. 0.1; 
-   -10. 4. 4. 0. 0.1; 
    
-   -10. -1. 6. 0. 0.0001; (no correlation between sizeX and E) 
-   -10. -3. 6. 0. 0.0001; (no correlation between sizeY and E) 
-   
-   24. 1. 1. 1. ; (define register 1 with size X)
-   24. 3. 3. 2. ; (define register 2 with size Y)
-   25. 1. 2. 2. 3. ; (define register 3 = register 1 - register 2 = size x - size y)
-   25. 3. 3. 3. 4. ; (take the square)
-   -10. 9. 4. 0. .01; (contraint on register 4 = 0)
-   
-   24. 2. 2. 5. ; (define register 5 with divergence X)
-   24. 4. 4. 6. ; (define register 6 with divergence Y)
-   25. 5. 6. 2. 7. ; (define register 7 = register 5 - register 6 = size x - size y)
-   25. 7. 7. 3. 8. ; (take the square)
-   -10. 9. 8. 0. .01; (contraint on register 8 = 0)
-   
-   -10. 1. 1. 10. 0.01;
-   -10. 3. 3. 10. 0.01;
    
    3. 0.05 /BPM3/ ;
    
-   3. 0.15 ;
+   3. 0.05 ;
+   
+   (slit 0.1 -.015 .015 lead ; /SLX/ ) 
+   3. 0.1  ;
+   
+   3. 0.05 ;
    
    

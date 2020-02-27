@@ -267,7 +267,7 @@ def BL_geometry(BL : Beamline, refp=0):
         
         
         
-    plt.title('representation of the ganry layout')    
+    plt.title('representation of the beamline layout')    
     ax_X.set_xlabel('length [m]')
     ax_X.set_ylabel('height [m]')
     ax_X.set_xlim([-0.5,max_x+1]) 

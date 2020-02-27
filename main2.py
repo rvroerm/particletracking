@@ -26,7 +26,7 @@ my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
 
 
 refE = 160
-
+DeltaE = 1.5
 
 # plot beamline
 BL_geometry(my_beamline, refp=EtoP(refE))
@@ -35,12 +35,16 @@ BL_geometry(my_beamline, refp=EtoP(refE))
 # plot beam through BL
 
 
-my_beam = Beam(nb_part=10, refE = refE, DeltaE=5, E_dist='normal',  \
-                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
-                       DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
+my_beam = Beam(nb_part=1000, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
+                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
+                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
 
 
+# my_beam = Beam(nb_part=1, refE = refE, DeltaE=0, E_dist='cst',  \
+#                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+#                        DeltaDivX = 0.025, DeltaDivY = 0.025, div_dist='cst')
 
+    
 [fig, ax_X, ax_Y] = plot_beam_through_BL(my_beam = my_beam, my_beamline = my_beamline)
   
     
@@ -79,6 +83,12 @@ sns.distplot(np.clip(Y[~np.isnan(Y)],-0.1,0.1)*1000, kde=False, fit=norm, fit_kw
 
 plt.legend(["sigmaX = %.2f mm"%(sigmaX*1000),"sigmaY = %.2f mm"%(sigmaY*1000)], loc='upper right')
 
+print("sigmaX = %.2f mm, sigmaY = %.2f mm"%(sigmaX*1000 , sigmaY*1000))
+
+sigma_X = my_beam.size_X(row_nb = p_ISO_index)
+sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
+print("sigmaX = %.2f mm, sigmaY = %.2f mm"%(sigmaX*1000 , sigmaY*1000))
+
 plt.xlabel('x/y [mm]')
 plt.ylabel('counts (arb units)')
 
@@ -91,8 +101,8 @@ fig = plt.figure("energy plot")
 
 E_source = my_beam.get_beam_param(param='E', row_nb=0)
 E_ISO = my_beam.get_beam_param(param='E', row_nb=p_ISO_index)
-plt.hist(E_source[~np.isnan(E_source)], bins=20, alpha=0.3, range=(refE-5,refE+5), label="E source")
-plt.hist(E_ISO[~np.isnan(E_ISO)], bins=20, alpha=0.3, range=(refE-5,refE+5), label="E ISO")
+plt.hist(E_source[~np.isnan(E_source)], bins=20, alpha=0.3, range=(refE-DeltaE,refE+DeltaE), label="E source")
+plt.hist(E_ISO[~np.isnan(E_ISO)], bins=20, alpha=0.3, range=(refE-DeltaE,refE+DeltaE), label="E ISO")
 plt.title('Energy transmission')
 plt.legend(loc='upper right')
 plt.xlabel('E [MeV]')
@@ -115,9 +125,11 @@ if variation_study:
     
     elements_to_tune = ["Q1C","Q2C","Q3C","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
     #elements_to_tune = ["Q4X","Q5Y"]
+    elements_to_tune = ["QN1","QN3"]
     
-    tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
-    #tune_range = [0.8, 0.9, 0.95, 1, 1.05, 1.1, 1.2]
+    #tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
+    tune_range = [0.8, 0.9, 0.95, 1, 1.05, 1.1, 1.2]
+    
     
     for element_to_tune in elements_to_tune:
         print("Element: %s"%element_to_tune)
@@ -149,11 +161,13 @@ if variation_study:
             ##############################
             # 2. case of a full beam
             
-            my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='cst',  \
-                               DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+            my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='uniform2',  \
+                               DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
                                DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
             
             my_beam.beam_through_BL(my_beamline)
+            
+            p_ISO_index = my_beam.particle_list[0].get_z_index(z_ISO)
             sigma_X = my_beam.size_X(row_nb = p_ISO_index)
             sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
             
@@ -161,8 +175,10 @@ if variation_study:
             X = my_beam.get_beam_param(param='x', row_nb=p_ISO_index)
             
             efficiency = len(X[~np.isnan(X)]) / len(X)
+            print('Field = %0.2f'%(ref_field * B_factor))
             print('B_factor = %0.2f : sigma_X = %0.2f , sigma_Y = %0.2f , efficiency = %.1f %% '%(B_factor, sigma_X*1000, sigma_Y*1000, efficiency*100))
             
+
             
             new_line = pd.DataFrame.from_dict({'magnet' : [element_to_tune], 
                                                'factor' : [B_factor], 
@@ -181,10 +197,12 @@ if variation_study:
     
         print('\n')
 
+
+
 ###############################################################################
 # correcting magnet variation
 
-variation_study = False
+variation_study = True
 
 if variation_study:
     
@@ -193,22 +211,24 @@ if variation_study:
     my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
     
     #elements_to_tune = ["Q1C","Q2C","Q3C","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
-    elements_to_correct = ["Q2C"]
-    elements_to_correct = ["QN1"]
-    error_range = [0.5,0.6,0.7,0.8,0.9,1,1.1,1.5,2]
     
-    elements_to_tune = ["Q4X", "Q5Y"]
-    elements_to_tune = ["QN2"]
+    elements_to_correct = ["QN1"]
+    #elements_to_correct = ["Q4X","Q5Y"]
+    error_range = [0.5,0.6,0.7,0.8,0.9,1,1.1,1.5,2]
+    error_range = [0.8, 0.9,0.95, 1, 1.05, 1.1, 1.2]
+    
+    elements_to_tune = ["QN1", "QN3"]
+    elements_to_tune = ["QN3"]
     
     #tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
     #tune_range = [0.5, 0.75, 0.9, 0.95, 1, 1.05, 1.1, 1.25, 1.5]
-    tune_range = [0.9,0.95, 1, 1.05, 1.1,1.15,1.1]
-    tune_range = [0.5,0.6,0.7,0.8,0.9,1,1.1,1.5,2]
+    tune_range = [0.8, 0.9,0.95, 1, 1.05, 1.1, 1.2]
+    #tune_range = [0.5,0.6,0.7,0.8,0.9,1,1.1,1.5,2]
     
     for element_to_correct in elements_to_correct:
         
         print('\n')
-        
+        print('****************************************')
         print("Element to correct: %s"%element_to_correct)
         
         # get element from beamline
@@ -222,7 +242,7 @@ if variation_study:
             print('%s = %0.2f'%(element_to_correct, ref_field1  * error_on_magnet))
             
             for element_to_tune in elements_to_tune:
-                print("Element: %s"%element_to_tune)
+                print("\n Element: %s"%element_to_tune)
                 
                 # get element from beamline
                 index = my_beamline.get_element_index(element_to_tune)
@@ -237,8 +257,8 @@ if variation_study:
                     
                     # case of a full beam
                     
-                    my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='cst',  \
-                                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+                    my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='uniform2',  \
+                                       DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
                                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
                     
                     my_beam.beam_through_BL(my_beamline)

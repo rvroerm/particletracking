@@ -15,7 +15,7 @@ import warnings
 #import matplotlib.pyplot as plt
 
 
-def transport_count_lines(transport_file,N_segments = 10,print_elements=False):
+def transport_count_lines(transport_file, N_segments = 10, print_elements=False):
     """
     counts the number of relevant lines in file
     N_segments is the number of points displayed by element

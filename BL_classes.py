@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
     
 class BL_Element:
     """
-    Define any element in the beamline.  Default = drift
+    Define beamline element.  Default = drift, other elements in child classes
     """
 
     def __init__(self, name="", length=0):
@@ -50,7 +50,9 @@ class BL_Element:
         
     
 class Dipole(BL_Element):
-    # to be completed: move into other classes
+    """
+    Dipole class
+    """
     
     def __init__(self, name="", length=0, B=0, n=0, apertureY=0, apertureX=0, pole_face1=0, pole_face2=0, \
                curvature=0, CCT_angle = 0, k1 = 0.5, k2 = 0, \

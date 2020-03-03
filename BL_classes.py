@@ -9,7 +9,7 @@ Created on Mon Jan 13 15:40:04 2020
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat, Highland
+from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat, Highland, rot_mat
 from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, pi
 import warnings
 import time
@@ -24,7 +24,7 @@ class BL_Element:
     Define beamline element.  Default = drift, other elements in child classes
     """
 
-    def __init__(self, name="", length=0):
+    def __init__(self, name="", length=0, element_rot_rad=0):
         self.name = name
         self.length = length
         self.element_type = "drift" # default is a drift
@@ -34,6 +34,7 @@ class BL_Element:
         self.apertureX = 1 # default aperture = 1m
         self.apertureY = 1 # default aperture = 1m
         self.coil_height = 0 # default coil height
+        self.element_rot_rad = element_rot_rad # rotation of the element in the X/Y plane
      
     
     def set_coil_height(self, h):
@@ -54,10 +55,10 @@ class Dipole(BL_Element):
     Dipole class
     """
     
-    def __init__(self, name="", length=0, B=0, n=0, apertureY=0, apertureX=0, pole_face1=0, pole_face2=0, \
+    def __init__(self, name="", length=0, element_rot_rad=0, B=0, n=0, apertureY=0, apertureX=0, pole_face1=0, pole_face2=0, \
                curvature=0, CCT_angle = 0, k1 = 0.5, k2 = 0, \
                aperture_type = 'circular' ,nb_pts=10):
-        super().__init__(name=name, length=length)
+        super().__init__(name=name, length=length, element_rot_rad=element_rot_rad)
         self.element_type = "dipole"
         self.Bfield = B
         self.order = n
@@ -76,9 +77,9 @@ class Dipole(BL_Element):
 		
 class Quadrupole(BL_Element):
     
-    def __init__(self, name="", length=0, B=0, a=0, CCT_angle = 0, \
+    def __init__(self, name="", length=0, element_rot_rad=0, B=0, a=0, CCT_angle = 0, \
                aperture_type = 'circular' ,nb_pts=10):
-        super().__init__(name=name, length=length)
+        super().__init__(name=name, length=length, element_rot_rad=element_rot_rad)
         self.element_type = "quad"
         self.Bfield = B
         self.apertureY = a
@@ -89,9 +90,9 @@ class Quadrupole(BL_Element):
         
 class Sextupole(BL_Element):
     
-    def __init__(self, name="", length=0, B=0, a=0, CCT_angle = 0, \
+    def __init__(self, name="", length=0, element_rot_rad=0, B=0, a=0, CCT_angle = 0, \
                aperture_type = 'circular' ,nb_pts=10):
-        super().__init__(name=name, length=length)
+        super().__init__(name=name, length=length, element_rot_rad=element_rot_rad)
         self.element_type = "sext"
         self.Bfield = B
         self.apertureY = a
@@ -118,9 +119,9 @@ class Solenoid(BL_Element):
         
 class Slit(BL_Element):
     
-    def __init__(self, gap=0, name="", length=0, orientation='X', mat ='lead', offset = 0, nb_pts=20):
+    def __init__(self, gap=0, name="", length=0, element_rot_rad=0, orientation='X', mat ='lead', offset = 0, nb_pts=20):
         
-        super().__init__(name=name, length=length)
+        super().__init__(name=name, length=length, element_rot_rad=element_rot_rad)
         self.element_type = "slit"
         
         if orientation == 'X':
@@ -302,7 +303,7 @@ class Particle:
         return 
     
     
-    def particle_through_slit(self, slit : BL_Element):
+    def particle_through_slit(self, slit : Slit):
         """
         slit with 2 blades (left and right)
         """
@@ -337,7 +338,80 @@ class Particle:
         
         return 
     
+    def particle_through_dipole(self, element: Dipole):
+        N_segments = element.N_segments 
+            
+        B = element.Bfield
+        L = element.length/N_segments
+        n = element.order
+        k1 = element.k1
+        k2 = element.k2
+        apertureY = element.apertureY
+        pole_face1 = element.pole_face1
+        pole_face2 = element.pole_face2
+        
+        # X/Y rotation of element
+        angle = element.element_rot_rad
+        rot_mat1 = rot_mat(angle)
+        rot_mat2 = rot_mat(-angle)
+        
+        dipole_mat = rot_mat2 @ sec_bend_matrix(L,B,n, self.get_p(), rest_mass=self.rest_mass) @ rot_mat1
+        
+        # entrance pole face calculations if non zero
+        if ~np.isnan(pole_face1) :
+            angle_mat1 = rot_mat2 @ pole_face_mat(pole_face1, B, apertureY, self.get_p(), k1, k2) @ rot_mat1
+            
+            # calculate new particle properties 
+            self.it = self.it + 1
+            self.X[self.it, :] = np.matmul(angle_mat1, self.X[self.it - 1, :])
+            self.z[self.it] = self.z[self.it-1] 
+        
+        # insisde dipole
+        for i in np.arange(0, N_segments):
+            # calculate new particle properties and put them in a new raw
+            
+            self.it = self.it + 1
+            self.X[self.it, :] = np.matmul(dipole_mat, self.X[self.it - 1, :])
+            self.z[self.it] = self.z[self.it-1] + L
+            
+            self.kill_lost_particle(element)
+            
+        # exit pole face calculations if non zero
+        if ~np.isnan(pole_face2) :
+            angle_mat2 = rot_mat2 @ pole_face_mat(pole_face2, B, apertureY, self.get_p(), k1, k2) @ rot_mat1
+            
+            # calculate new particle properties 
+            self.it = self.it + 1
+            self.X[self.it, :] = np.matmul(angle_mat2, self.X[self.it - 1, :])
+            self.z[self.it] = self.z[self.it-1] 
+            
+        return
     
+    
+    def particle_through_quadrupole(self, element: Quadrupole):
+        N_segments = element.N_segments
+        
+        B = element.Bfield
+        L = element.length/N_segments
+        a = element.apertureY
+        
+        # X/Y rotation of element
+        angle = element.element_rot_rad
+        rot_mat1 = rot_mat(angle)
+        rot_mat2 = rot_mat(-angle)
+        
+        quad_mat = rot_mat2 @ quad_matrix(L, B, a, self.get_p(), rest_mass=self.rest_mass) @ rot_mat1
+        
+        
+        for i in np.arange(0, N_segments):
+            # calculate new particle properties 
+            self.it = self.it + 1
+            self.X[self.it, :] = np.matmul(quad_mat, self.X[self.it - 1, :])
+            self.z[self.it] = self.z[self.it-1] + L
+            
+            self.kill_lost_particle(element)
+            
+        return
     
     def kill_lost_particle(self, element: BL_Element):
         if element.aperture_type == "rectangular":
@@ -349,86 +423,35 @@ class Particle:
                 # kill particle
                 self.X[self.it, :] = np.nan
     
+    
     def particle_through_BLelement(self, element : BL_Element):
-        
+        """
+        computes the tranport of the particle through an beamline element 
+        (drift, dipole, quadrupole, tc.)
+        """
         
         if element.element_type == "drift" or element.element_type == "BPM" :            
             self.particle_through_drift(element)
             
         elif element.element_type == "dipole" :
-            
-            N_segments = element.N_segments 
-            
-            B = element.Bfield
-            L = element.length/N_segments
-            n = element.order
-            k1 = element.k1
-            k2 = element.k2
-            apertureY = element.apertureY
-            pole_face1 = element.pole_face1
-            pole_face2 = element.pole_face2
-            
-            
-            
-            
-            dipole_mat = sec_bend_matrix(L,B,n, self.get_p(), rest_mass=self.rest_mass)
-            
-            
-            # entrance pole face calculations if non zero
-            if ~np.isnan(pole_face1) :
-                angle_mat1 = pole_face_mat(pole_face1, B, apertureY, self.get_p(), k1, k2)
-                
-                # calculate new particle properties 
-                self.it = self.it + 1
-                self.X[self.it, :] = np.matmul(angle_mat1, self.X[self.it - 1, :])
-                self.z[self.it] = self.z[self.it-1] 
-            
-            # insisde dipole
-            for i in np.arange(0, N_segments):
-                # calculate new particle properties and put them in a new raw
-                
-                self.it = self.it + 1
-                self.X[self.it, :] = np.matmul(dipole_mat, self.X[self.it - 1, :])
-                self.z[self.it] = self.z[self.it-1] + L
-                
-                self.kill_lost_particle(element)
-                
-            # exit pole face calculations if non zero
-            if ~np.isnan(pole_face2) :
-                angle_mat2 = pole_face_mat(pole_face2, B, apertureY, self.get_p(), k1, k2)
-                
-                # calculate new particle properties 
-                self.it = self.it + 1
-                self.X[self.it, :] = np.matmul(angle_mat2, self.X[self.it - 1, :])
-                self.z[self.it] = self.z[self.it-1] 
-                
+            self.particle_through_dipole(element)
+             
         elif element.element_type == "quad" :
+            self.particle_through_quadrupole(element)
             
-            N_segments = element.N_segments
-        
-            B = element.Bfield
-            L = element.length/N_segments
-            a = element.apertureY
-            
-            quad_mat = quad_matrix(L, B, a, self.get_p(), rest_mass=self.rest_mass)
-            
-            
-            for i in np.arange(0, N_segments):
-                # calculate new particle properties 
-                self.it = self.it + 1
-                self.X[self.it, :] = np.matmul(quad_mat, self.X[self.it - 1, :])
-                self.z[self.it] = self.z[self.it-1] + L
-                
-                self.kill_lost_particle(element)
-                
         elif element.element_type == "slit" :                
             self.particle_through_slit(element)
+            
         else:
             warnings.warn("Element transfer function not defined: ",element.element_type) 
             
         return    
-            
+        
+    
     def particle_through_BL(self, BL : Beamline()):
+        """
+        computes the tranport of the particle through all element in the beamline
+        """
         
         if len(self.z) < BL.get_total_segments() :
             raise Exception("Beamline requires bigger length for particle set: increase max_it")
@@ -563,6 +586,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
     my_beamline = Beamline()
     
     vertical_aperture = 0.03 # default value
+    element_angle = 0
     
     filepath = transport_file
     with open(filepath) as fp:  
@@ -648,7 +672,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                                       apertureX=horizontal_aperture, apertureY=vertical_aperture, \
                                       aperture_type = aperture_type, \
                                       pole_face1=angle_in, pole_face2=angle_out,\
-                                      CCT_angle = CCT_angle)
+                                      CCT_angle = CCT_angle, element_rot_rad=element_angle)
                        
                    my_beamline.add_element(new_element)
                 
@@ -666,7 +690,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                        name = line[posL+1 : posR].strip()
                    else: name = ""
                    
-                   new_element = Quadrupole(name = name, length = L, B=B, a=a, CCT_angle = CCT_angle)
+                   new_element = Quadrupole(name = name, length = L, B=B, a=a, CCT_angle = CCT_angle, element_rot_rad=element_angle)
                    
                    my_beamline.add_element(new_element)
                    
@@ -692,7 +716,7 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                        name = line[posL+1 : posR].strip()
                    else: name = ""
                    
-                   new_element = Slit(name = name, length = L, gap=opening, orientation=oritentation, mat = mat, offset = offset, nb_pts=20)
+                   new_element = Slit(name = name, length = L, gap=opening, orientation=oritentation, mat = mat, offset = offset, nb_pts=20, element_rot_rad=element_angle)
                    my_beamline.add_element(new_element)
                    
                    line = fp.readline() # skip next drift
@@ -702,6 +726,12 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                   if data[1][0:2] == "5." or data[1][0:1] == '5' :
                        # aperture
                        vertical_aperture = float(data[2].replace(";","") )/1000
+                       
+                       
+               elif data[0][0:3] == "20.":
+                   element_angle = element_angle + np.radians(float(data[1].replace(";","") ))
+                   
+                   
                    
                     
                     

@@ -202,7 +202,7 @@ if variation_study:
 ###############################################################################
 # correcting magnet variation
 
-variation_study = True
+variation_study = False
 
 if variation_study:
     
@@ -239,10 +239,10 @@ if variation_study:
         for error_on_magnet in error_range:
         
             my_beamline.BL_df.loc[index1,'BL object'].Bfield = ref_field1  * error_on_magnet
-            print('%s = %0.2f'%(element_to_correct, ref_field1  * error_on_magnet))
+            print('\n %s = %0.2f'%(element_to_correct, ref_field1  * error_on_magnet))
             
             for element_to_tune in elements_to_tune:
-                print("\n Element: %s"%element_to_tune)
+                print("Element: %s"%element_to_tune)
                 
                 # get element from beamline
                 index = my_beamline.get_element_index(element_to_tune)

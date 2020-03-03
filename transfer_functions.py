@@ -522,7 +522,7 @@ def sextupole(L,B,a,alpha,beam,it_z,refE,N_segments = 10):
         it_z = it_z + 1
         beam[it_z,0] = beam[it_z-1,0] + L_segment
         
-        beam_rot_in = rotation(beam[it_z-1,1:7],alpha)
+        beam_rot_in = rot_beam(beam[it_z-1,1:7],alpha)
         
         beam_rot_out[0] = R11*beam_rot_in[0] + R12*beam_rot_in[1] + T111*beam_rot_in[0]**2 + T112*beam_rot_in[0]*beam_rot_in[1] + T122*beam_rot_in[1]**2 + T133*beam_rot_in[2]**2 + T134*beam_rot_in[2]*beam_rot_in[3] + T144*beam_rot_in[3]**2
         beam_rot_out[1] = R22*beam_rot_in[1] + T211*beam_rot_in[0]**2 + T212*beam_rot_in[0]*beam_rot_in[1] + T222*beam_rot_in[1]**2 + T233*beam_rot_in[2]**2 + T234*beam_rot_in[2]*beam_rot_in[3] + T244*beam_rot_in[3]**2
@@ -532,7 +532,7 @@ def sextupole(L,B,a,alpha,beam,it_z,refE,N_segments = 10):
         beam_rot_out[5] = beam_rot_in[5]
         
         
-        beam_rot_out = rotation(beam_rot_out,-alpha)
+        beam_rot_out = rot_beam(beam_rot_out,-alpha)
         beam[it_z,1:7] = np.transpose(beam_rot_out)
     
     return [beam, it_z]
@@ -956,7 +956,9 @@ def collimator(L_m,a,mat,beam,it_z,refE,N_segments):
     
     return [beam, it_z]
 
-def rotation(beam,angle):
+
+def rot_mat(angle):
+    """ rotation matrix for the beam coordinates by some angle in the X-Y plane"""
     
     rot_mat = np.array([[cos(angle),0,sin(angle),0,0,0],
                     [0,cos(angle),0,sin(angle),0,0],
@@ -965,7 +967,13 @@ def rotation(beam,angle):
                     [0,0,0,0,1,0],
                     [0,0,0,0,0,1]])
     
-    beam = np.matmul(rot_mat,beam)
+    return rot_mat
+
+
+def rot_beam(beam, angle):
+    """ rotate the beam coordinates by some angle in the X-Y plane"""
+    
+    beam = np.matmul(rot_mat(angle), beam)
     
     return beam
     

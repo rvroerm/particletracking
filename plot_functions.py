@@ -264,8 +264,7 @@ def BL_geometry(BL : Beamline, refp=0):
         if start_point[0]>max_x : max_x = start_point[0]
         if start_point[1]>max_y : max_y = start_point[1]
             
-        
-        
+    
         
     plt.title('representation of the beamline layout')    
     ax_X.set_xlabel('length [m]')
@@ -273,6 +272,11 @@ def BL_geometry(BL : Beamline, refp=0):
     ax_X.set_xlim([-0.5,max_x+1]) 
     ax_X.set_ylim([-0.5,max_y+1]) 
     ax_X.grid(which='major')
+    
+    # resize figure
+    fig.set_size_inches(12, 12*(max_y+1.5)/(max_x+1.5))
+    
+    print(18*(max_y+1.5)/(max_x+1.5))
     
     return [fig]
 

@@ -26,10 +26,15 @@ my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
 
 
 refE = 160
-DeltaE = 1.5
+DeltaE = 5
 
 # plot beamline
 BL_geometry(my_beamline, refp=EtoP(refE))
+
+
+
+
+
 
 #########################################################################
 # plot beam through BL
@@ -74,24 +79,31 @@ print("efficiency = %.2f %% "%(efficiency*100))
 
 
 fig = plt.figure('transverse profile',figsize=(9, 9))
+ax = fig.add_subplot(111)
 
-sns.distplot(np.clip(X[~np.isnan(X)],-0.1,0.1)*1000, kde=False, fit=norm, fit_kws={"color":"blue"})
-(muX, sigmaX) = norm.fit(X[~np.isnan(X)])
+clip_dist = 0.05 # show particles within [-0.05,0.05] only
 
-sns.distplot(np.clip(Y[~np.isnan(Y)],-0.1,0.1)*1000, kde=False, fit=norm, fit_kws={"color":"red"})
-(muY, sigmaY) = norm.fit(Y[~np.isnan(Y)])
+sns.distplot(np.clip(X[~np.isnan(X)], -clip_dist, clip_dist)*1000, kde=False, fit=norm, fit_kws={"color":"blue"}, ax=ax)
+sns.distplot(np.clip(Y[~np.isnan(Y)], -clip_dist, clip_dist)*1000, kde=False, fit=norm, fit_kws={"color":"red"}, ax=ax)
 
-plt.legend(["sigmaX = %.2f mm"%(sigmaX*1000),"sigmaY = %.2f mm"%(sigmaY*1000)], loc='upper right')
-
+sigmaX = my_beam.size_X(row_nb = p_ISO_index, clip_dist=clip_dist)
+sigmaY = my_beam.size_Y(row_nb = p_ISO_index, clip_dist=clip_dist)
 print("sigmaX = %.2f mm, sigmaY = %.2f mm"%(sigmaX*1000 , sigmaY*1000))
+ax.legend(["sigmaX = %.2f mm"%(sigmaX*1000),"sigmaY = %.2f mm"%(sigmaY*1000)], loc='upper right')
 
-sigma_X = my_beam.size_X(row_nb = p_ISO_index)
-sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
-print("sigmaX = %.2f mm, sigmaY = %.2f mm"%(sigmaX*1000 , sigmaY*1000))
 
-plt.xlabel('x/y [mm]')
-plt.ylabel('counts (arb units)')
+ax.set_xlabel('x/y [mm]')
+ax.set_ylabel('counts (arb units)')
 
+
+# plot X-Y positions at isocenter with color legend refering to the particle energy
+E = my_beam.get_beam_param(param='E', row_nb=0)
+
+fig = plt.figure('positions vs E')
+sns.scatterplot(x=X, y=Y, hue=E, hue_norm=(refE-DeltaE, refE+DeltaE))
+plt.xlabel('x [mm]')
+plt.ylabel('y [mm]')
+plt.legend(title = 'E [MeV]')
 
 
 ###############################################################################\
@@ -203,6 +215,7 @@ if variation_study:
 # correcting magnet variation
 
 variation_study = False
+clip_dist = 0.03
 
 if variation_study:
     
@@ -212,13 +225,13 @@ if variation_study:
     
     #elements_to_tune = ["Q1C","Q2C","Q3C","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
     
-    elements_to_correct = ["QN1"]
+    elements_to_correct = ["Q4X"]
     #elements_to_correct = ["Q4X","Q5Y"]
     error_range = [0.5,0.6,0.7,0.8,0.9,1,1.1,1.5,2]
     error_range = [0.8, 0.9,0.95, 1, 1.05, 1.1, 1.2]
     
     elements_to_tune = ["QN1", "QN3"]
-    elements_to_tune = ["QN3"]
+    elements_to_tune = ["Q5Y"]
     
     #tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
     #tune_range = [0.5, 0.75, 0.9, 0.95, 1, 1.05, 1.1, 1.25, 1.5]
@@ -257,13 +270,13 @@ if variation_study:
                     
                     # case of a full beam
                     
-                    my_beam = Beam(nb_part=100, refE = refE, DeltaE=1.5, E_dist='uniform2',  \
+                    my_beam = Beam(nb_part=100, refE = refE, DeltaE=3, E_dist='uniform2',  \
                                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
                                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
                     
                     my_beam.beam_through_BL(my_beamline)
-                    sigma_X = my_beam.size_X(row_nb = p_ISO_index)
-                    sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
+                    sigma_X = my_beam.size_X(row_nb = p_ISO_index, clip_dist=clip_dist)
+                    sigma_Y = my_beam.size_Y(row_nb = p_ISO_index, clip_dist=clip_dist)
                     
                     # efficiency
                     X = my_beam.get_beam_param(param='x', row_nb=p_ISO_index)

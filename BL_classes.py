@@ -558,14 +558,48 @@ class Beam:
         
         
         
-    def size_X(self, row_nb=-1):
+    def size_X(self, row_nb=-1, clip_dist=1):
+        """
+    
+        Parameters
+        ----------
+        row_nb : int, optional
+            Row number (in Particle dataframe) at which the property is calculated. The default is -1.
+        clip_dist : float, optional
+            Use  particles within [-clip_dist,clip_dist] only. The default is 1.
+
+        Returns
+        -------
+        sigma : float
+            Transverse size X of the beam.
+            
+        """
+        
         values = self.get_beam_param(param='x', row_nb=row_nb)
-        (mu, sigma) = norm.fit(values[~np.isnan(values)])
+        (mu, sigma) = norm.fit(np.clip(values[~np.isnan(values)], -clip_dist, clip_dist))
+        
+        
         return sigma
     
-    def size_Y(self, row_nb=-1):
+    def size_Y(self, row_nb=-1, clip_dist=1):
+        """
+    
+        Parameters
+        ----------
+        row_nb : int, optional
+            Row number (in Particle dataframe) at which the property is calculated. The default is -1.
+        clip_dist : float, optional
+            Use  particles within [-clip_dist,clip_dist] only. The default is 1.
+
+        Returns
+        -------
+        sigma : float
+            Transverse size Y of the beam.
+            
+        """
+        
         values = self.get_beam_param(param='y', row_nb=row_nb)
-        (mu, sigma) = norm.fit(values[~np.isnan(values)])
+        (mu, sigma) = norm.fit(np.clip(values[~np.isnan(values)], -clip_dist, clip_dist))
         return sigma
     
     def beam_through_BL(self, BL : Beamline()):
@@ -651,8 +685,8 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                    data = line.split() 
                    
                    if data: # string is not empty
-                       if data_prev[0] == "2.": # exit pole face
-                           angle_out = float(data_prev[1].replace(";","") )
+                       if data[0] == "2.": # exit pole face
+                           angle_out = float(data[1].replace(";","") )
                        else:
                            fp.seek(last_pos) # go back, exit face not defined
                    

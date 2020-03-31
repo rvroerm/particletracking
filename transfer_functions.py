@@ -714,10 +714,13 @@ def pole_face_mat(angle,B,gap,p,k1=0.5,k2=0,paraxial_correction = False):
     see SLAC transport manual
     """
     
+    if B==0 :
+        return np.identity(6)
+    
+    
     Brho  = PtoBrho(p)
     
     radius = Brho/B
-    
     beta = math.radians(angle)
     
     

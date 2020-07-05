@@ -46,8 +46,8 @@ my_beam = Beam(nb_part=1000, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
 
 
 # my_beam = Beam(nb_part=1, refE = refE, DeltaE=0, E_dist='cst',  \
-#                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
-#                        DeltaDivX = 0.025, DeltaDivY = 0.025, div_dist='cst')
+#                         DeltaX = 10**-5, DeltaY = 10**-5, size_dist='cst', \
+#                         DeltaDivX = 0.025, DeltaDivY = 0.025, div_dist='cst')
 
     
 [fig, ax_X, ax_Y] = plot_beam_through_BL(my_beam = my_beam, my_beamline = my_beamline)
@@ -136,8 +136,8 @@ if variation_study:
     my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
     
     elements_to_tune = ["Q1C","Q2C","Q3C","Q4X","Q5Y","Q1G","Q2G","Q3G","Q4G"]
-    #elements_to_tune = ["Q4X","Q5Y"]
-    elements_to_tune = ["QN1","QN3"]
+    elements_to_tune = ["Q4X","Q5Y"]
+    elements_to_tune = ["TUN1","TUN2"]
     
     #tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
     tune_range = [0.8, 0.9, 0.95, 1, 1.05, 1.1, 1.2]

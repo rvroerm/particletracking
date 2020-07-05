@@ -8,7 +8,8 @@ Created on Sun May  5 12:15:26 2019
 import os
 import math as math
 import numpy as np
-from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt
+from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, pi
+from numpy import sign
 from scipy.optimize import curve_fit
 
 import warnings
@@ -600,7 +601,6 @@ def sec_bend_matrix(L,B,n,p,rest_mass=938):
 
 
 
-
 def sec_bend(L,B,n,gap,beam,refE,it_z,N_segments = 10,kill_lost_particles=True,rest_mass=938,gap_X=1, \
           paraxial_correction = False, dpz_tolerance=10**-6):
     """
@@ -656,11 +656,9 @@ def sec_bend(L,B,n,gap,beam,refE,it_z,N_segments = 10,kill_lost_particles=True,r
             else:
                 it_z = it_z + 1
                 beam[it_z,0] = beam[it_z-1,0] + L_segment
-                beam[it_z,1:7] = np.matmul(bend_mat,np.transpose(beam[it_z-1,1:7]))
+                beam[it_z,1:7] = np.matmul(bend_mat,np.transpose(beam[it_z-1,1:7]))  # already calculated in new_beam above?
                 
             
-    
-    p = ref_p + beam[it_z,6]*ref_p
     
     return [beam, it_z]
 

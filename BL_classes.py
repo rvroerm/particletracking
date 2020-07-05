@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat, Highland, rot_mat
-from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, pi
+from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, pi, atan, asin, acos
 import warnings
 import time
 import copy
@@ -101,11 +101,20 @@ class Sextupole(BL_Element):
         self.N_segments = nb_pts
         self.CCT_angle = CCT_angle # angle of the windings in the CCT case
 
-
-
+class ScanMagnet(BL_Element):
+    
+    def __init__(self, name="", length=0, Bx=0, By=0, \
+               aperture_type = 'rectangular' ,nb_pts=10):
+        super().__init__(name=name, length=length)
+        self.element_type = "SM"
+        self.Bx = Bx
+        self.By = By
+        self.aperture_type = aperture_type
+        self.N_segments = nb_pts
+        
 class Solenoid(BL_Element):
     
-    def __init__(self, name="", length=0, B=0, a=0, CCT_angle = 0, \
+    def __init__(self, name="", length=0, B=0, a=0, \
                aperture_type = 'circular' ,nb_pts=20):
         super().__init__(name=name, length=length)
         self.element_type = "solenoid"
@@ -114,7 +123,6 @@ class Solenoid(BL_Element):
         self.apertureX = a
         self.aperture_type = aperture_type
         self.N_segments = nb_pts
-        self.CCT_angle = CCT_angle # angle of the windings in the CCT case
         
         
 class Slit(BL_Element):
@@ -338,6 +346,9 @@ class Particle:
         
         return 
     
+    
+        
+    
     def particle_through_dipole(self, element: Dipole):
         N_segments = element.N_segments 
             
@@ -424,10 +435,86 @@ class Particle:
                 self.X[self.it, :] = np.nan
     
     
+    def particle_through_SM(self, element: ScanMagnet):
+        " test scanning magnet - rectangular"
+        
+        L_segment = element.length / element.N_segments
+        p = self.get_p()
+        
+        Bx = element.Bx
+        By = element.By
+        Bz = 0 # assume transverse field
+        B = sqrt(Bx**2 + By**2 + Bz**2)
+       
+        
+        # get parallel and orthogonal components of p vs B
+        hypotenuse_p = sqrt(self.get_divx()**2 + self.get_divy()**2 + 1)
+        px = self.get_divx()/hypotenuse_p * p
+        py = self.get_divy()/hypotenuse_p * p
+        pz = 1/hypotenuse_p * p
+       
+        p_parallel = (px*Bx + py*By + pz*Bz) / B
+        p_orth = sqrt(p**2 - p_parallel**2)
+        
+        # get curvature radius
+        Brho  = PtoBrho(p_orth)
+        rho = Brho/B
+        
+        
+        # rotate B on +y axis
+        if Bx == 0:
+            By_angle = pi*(By<0) 
+        else:
+            By_angle = - atan(By/Bx) - pi*sign(By)
+        
+        
+        rot_Byangle = np.array([[cos(By_angle) , sin(By_angle)],
+                                [-sin(By_angle) , cos(By_angle)]])
+        
+        rot_Byangle2 = np.array([[cos(By_angle) , -sin(By_angle)],
+                                [sin(By_angle) , cos(By_angle)]])
+        
+        # rotate particle initial position and angle in rotated frame
+        new_pos_vect = np.matmul(rot_Byangle, 
+                                 np.array([[ self.get_x() ], [ self.get_y() ]]))  
+        x = new_pos_vect[0]
+        y = new_pos_vect[1]
+        new_angle_vect = np.matmul(rot_Byangle, 
+                                   np.array([[ self.get_divx() ], [ self.get_divy() ]]))  
+        divX = new_angle_vect[0]
+        divY = new_angle_vect[1]
+        
+        
+        
+        for i in range(0, element.N_segments):
+            # get exit position and angle
+            x = x + rho*cos(divX) - sqrt( rho**2 - (L_segment + rho*sin(divX))**2 )
+            y = y + divY * L_segment # drift in direction parallel to B
+            theta = 2 * asin(1/2/rho * sqrt( x**2 + L_segment**2 ))
+            divX = divX + theta
+            
+            
+            # rotate back
+            pos_vect = np.matmul(rot_Byangle2, np.array([x, y]))
+            div_vect = np.matmul(rot_Byangle2, np.array([divX, divY]))
+            
+            # update matrix
+            self.it = self.it + 1
+            self.X[self.it, 0] = pos_vect[0]
+            self.X[self.it, 1] = div_vect[0]
+            self.X[self.it, 2] = pos_vect[1]
+            self.X[self.it, 3] = div_vect[1]
+            self.X[self.it, 4] = self.X[self.it-1, 4]
+            self.X[self.it, 5] = self.X[self.it-1, 5]
+            self.z[self.it] = self.z[self.it-1] + L_segment
+        
+        return
+        
+        
     def particle_through_BLelement(self, element : BL_Element):
         """
         computes the tranport of the particle through an beamline element 
-        (drift, dipole, quadrupole, tc.)
+        (drift, dipole, quadrupole, etc.)
         """
         
         if element.element_type == "drift" or element.element_type == "BPM" :            
@@ -438,6 +525,9 @@ class Particle:
              
         elif element.element_type == "quad" :
             self.particle_through_quadrupole(element)
+        
+        elif element.element_type == "SM" :  
+            self.particle_through_SM(element)
             
         elif element.element_type == "slit" :                
             self.particle_through_slit(element)

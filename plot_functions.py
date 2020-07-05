@@ -253,9 +253,18 @@ def BL_geometry(BL : Beamline, refp=0):
             start_point = start_point + np.matmul(rot_mat, [element.length , 0])
         else:
             rho = 1/element.curvature
-            magnet_angle = element.length/rho
-            start_point = start_point + np.matmul(rot_mat, [rho*sin(magnet_angle) , rho*(1-cos(magnet_angle))])
-        
+            magnet_angle = element.length/rho 
+            
+            if element.element_rot_rad == 0 or element.element_rot_rad == np.pi or element.element_rot_rad == -np.pi :
+                # find start point for next element
+                # need to adjust with element_rot_rad depending if the magnet is bending upwards or downwards
+                # valid only if the beamline is in a plane (i.e. element_rot_rad=0, pi or -pi)
+                start_point = start_point + np.matmul(rot_mat, [rho*sin(magnet_angle) , rho*(1-cos(magnet_angle))*cos(element.element_rot_rad)])
+            else:
+                print("element_rot_rad = ",(np.degrees(element.element_rot_rad)))
+                warnings.warn("Beamline is not in plane, no 2D representation possible")
+                
+            
         # update rotation matrix to represent next element in the good orientation
         rot_mat = [[cos(rot_angle),-sin(rot_angle)],[sin(rot_angle),cos(rot_angle)]]
         
@@ -369,11 +378,27 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', \
         
         # get curvature of the magnet edges
         rho = abs(1/element.curvature)
-        up_rot = np.sign(B_angle)
+        
+        if element.element_rot_rad == 0 or element.element_rot_rad == np.pi or element.element_rot_rad == -np.pi :
+            # 2 options to code the left-right bending: 
+            # 1) negative value of B_angle
+            # 2) use of element_rot_rad
+            # need to adjust with element_rot_rad depending if the magnet is bending upwards or downwards
+            # valid only if the beamline is in a plane (i.e. element_rot_rad=0, pi or -pi)
+            
+            up_rot = np.sign(B_angle) * cos(element.element_rot_rad)
+            B_angle = B_angle * cos(element.element_rot_rad)
+            bend_angle = bend_angle * cos(element.element_rot_rad)
+        else:
+            print("element_rot_rad = ",(np.degrees(element.element_rot_rad)))
+            warnings.warn("Beamline is not in plane, no 2D representation possible")
+            
+            
         rho1 = abs(rho - up_rot*a)*up_rot
         rho2 = abs(rho - up_rot*(a+h))*up_rot
         rho3 = abs(rho + up_rot*a)*up_rot
         rho4 = abs(rho + up_rot*(a+h))*up_rot
+        
         
         for it in range(1, N_segments+1):
             # complete list of points

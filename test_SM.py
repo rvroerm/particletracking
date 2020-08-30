@@ -43,12 +43,14 @@ my_beamline = Beamline()
 
 drift = BL_Element(length = 0.2)
 
-SM = ScanMagnet(By = 0.3, length=0.2)
+SM = ScanMagnet(Bx=0., By = 0.3, length=0.2)
 
 
 my_beamline.add_element(drift)
 my_beamline.add_element(SM)
 my_beamline.add_element(BL_Element(length = 2))
 my_beamline.add_element(drift)
+
+
 
 [fig, ax_X, ax_Y] = plot_beam_through_BL(my_beam = my_beam, my_beamline = my_beamline)

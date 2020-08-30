@@ -40,9 +40,10 @@ BL_geometry(my_beamline, refp=EtoP(refE))
 # plot beam through BL
 
 
-my_beam = Beam(nb_part=1000, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
-                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
-                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform')
+my_beam = Beam(nb_part=100, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
+                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='normal', \
+                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='normal', \
+                        OffsetX = 0., OffsetY=0)
 
 
 # my_beam = Beam(nb_part=1, refE = refE, DeltaE=0, E_dist='cst',  \
@@ -78,13 +79,18 @@ efficiency = len(X[~np.isnan(X)]) / len(X)
 print("efficiency = %.2f %% "%(efficiency*100))
 
 
-fig = plt.figure('transverse profile',figsize=(9, 9))
+fig = plt.figure('transverse profile', figsize=(9, 9))
 ax = fig.add_subplot(111)
 
-clip_dist = 0.05 # show particles within [-0.05,0.05] only
+clip_dist = 0.2 # show particles within [-clip_dist,clip_dist] only
 
 sns.distplot(np.clip(X[~np.isnan(X)], -clip_dist, clip_dist)*1000, kde=False, fit=norm, fit_kws={"color":"blue"}, ax=ax)
 sns.distplot(np.clip(Y[~np.isnan(Y)], -clip_dist, clip_dist)*1000, kde=False, fit=norm, fit_kws={"color":"red"}, ax=ax)
+
+
+posX = my_beam.pos_X(row_nb = p_ISO_index, clip_dist=clip_dist)
+posY = my_beam.pos_Y(row_nb = p_ISO_index, clip_dist=clip_dist)
+print("posX = %.2f mm, posY = %.2f mm"%(posX*1000 , posY*1000))
 
 sigmaX = my_beam.size_X(row_nb = p_ISO_index, clip_dist=clip_dist)
 sigmaY = my_beam.size_Y(row_nb = p_ISO_index, clip_dist=clip_dist)
@@ -100,7 +106,7 @@ ax.set_ylabel('counts (arb units)')
 E = my_beam.get_beam_param(param='E', row_nb=0)
 
 fig = plt.figure('positions vs E')
-sns.scatterplot(x=X, y=Y, hue=E, hue_norm=(refE-DeltaE, refE+DeltaE))
+sns.scatterplot(x=X, y=Y, hue=E, hue_norm=(refE-abs(DeltaE), refE+abs(DeltaE)))
 plt.xlabel('x [mm]')
 plt.ylabel('y [mm]')
 plt.legend(title = 'E [MeV]')
@@ -113,8 +119,8 @@ fig = plt.figure("energy plot")
 
 E_source = my_beam.get_beam_param(param='E', row_nb=0)
 E_ISO = my_beam.get_beam_param(param='E', row_nb=p_ISO_index)
-plt.hist(E_source[~np.isnan(E_source)], bins=20, alpha=0.3, range=(refE-DeltaE,refE+DeltaE), label="E source")
-plt.hist(E_ISO[~np.isnan(E_ISO)], bins=20, alpha=0.3, range=(refE-DeltaE,refE+DeltaE), label="E ISO")
+plt.hist(E_source[~np.isnan(E_source)], bins=20, alpha=0.3, range=(refE-abs(DeltaE), refE+abs(DeltaE)), label="E source")
+plt.hist(E_ISO[~np.isnan(E_ISO)], bins=20, alpha=0.3, range=(refE-abs(DeltaE), refE+abs(DeltaE)), label="E ISO")
 plt.title('Energy transmission')
 plt.legend(loc='upper right')
 plt.xlabel('E [MeV]')

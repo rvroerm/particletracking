@@ -253,6 +253,8 @@ def transport_input(transport_file,beam,refE,it_p,N_segments,gap,k1,k2,z,it_z,sc
                    line = fp.readline() # skip next drift
                    cnt +=1 
                    
+               
+                   
                    
            prev_line = line     
            line = fp.readline()

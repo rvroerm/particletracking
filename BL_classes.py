@@ -103,12 +103,14 @@ class Sextupole(BL_Element):
 
 class ScanMagnet(BL_Element):
     
-    def __init__(self, name="", length=0, Bx=0, By=0, \
+    def __init__(self, name="", length=0, Bx=0, By=0, apertureX=0, apertureY=0, \
                aperture_type = 'rectangular' ,nb_pts=10):
         super().__init__(name=name, length=length)
         self.element_type = "SM"
         self.Bx = Bx
         self.By = By
+        self.apertureX = apertureX
+        self.apertureY = apertureY
         self.aperture_type = aperture_type
         self.N_segments = nb_pts
         
@@ -200,6 +202,8 @@ class Beamline:
                 N = N + 2 # add 2 segements for the pole faces
         
         return N
+    
+    
 
 
 
@@ -445,7 +449,10 @@ class Particle:
         By = element.By
         Bz = 0 # assume transverse field
         B = sqrt(Bx**2 + By**2 + Bz**2)
-       
+        
+        if B==0:
+            self.particle_through_drift(BL_Element(length=element.length))
+            return
         
         # get parallel and orthogonal components of p vs B
         hypotenuse_p = sqrt(self.get_divx()**2 + self.get_divy()**2 + 1)
@@ -458,21 +465,20 @@ class Particle:
         
         # get curvature radius
         Brho  = PtoBrho(p_orth)
-        rho = Brho/B
+        rho = Brho/B 
         
         
         # rotate B on +y axis
-        if Bx == 0:
-            By_angle = pi*(By<0) 
+        if By == 0:
+            By_angle = pi/2 + pi*(Bx<0) 
         else:
-            By_angle = - atan(By/Bx) - pi*sign(By)
+            By_angle = atan(Bx/By) - pi*(By>0)
         
-        
-        rot_Byangle = np.array([[cos(By_angle) , sin(By_angle)],
-                                [-sin(By_angle) , cos(By_angle)]])
-        
-        rot_Byangle2 = np.array([[cos(By_angle) , -sin(By_angle)],
+        rot_Byangle = np.array([[cos(By_angle) , -sin(By_angle)],
                                 [sin(By_angle) , cos(By_angle)]])
+        
+        rot_Byangle2 = np.array([[cos(By_angle) , sin(By_angle)],
+                                [-sin(By_angle) , cos(By_angle)]])
         
         # rotate particle initial position and angle in rotated frame
         new_pos_vect = np.matmul(rot_Byangle, 
@@ -507,6 +513,9 @@ class Particle:
             self.X[self.it, 4] = self.X[self.it-1, 4]
             self.X[self.it, 5] = self.X[self.it-1, 5]
             self.z[self.it] = self.z[self.it-1] + L_segment
+            
+            
+            self.kill_lost_particle(element)
         
         return
         
@@ -561,6 +570,7 @@ class Beam:
     def __init__(self, nb_part=1000, \
                        refE = 160, DeltaE=0, E_dist='uniform',  \
                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
+                       OffsetX = 0, OffsetY=0, \
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform', \
                        particle_type='proton'):
         
@@ -570,18 +580,18 @@ class Beam:
         for i in range(0,nb_part):
             # initialize particle properties
             if size_dist =='cst':
-                sizeX = DeltaX
-                sizeY = DeltaY
+                sizeX = DeltaX + OffsetX
+                sizeY = DeltaY + OffsetY
             elif size_dist == 'normal':
-                sizeX = DeltaX*np.random.normal(0,1)
-                sizeY = DeltaY*np.random.normal(0,1)
+                sizeX = DeltaX*np.random.normal(0,1) + OffsetX
+                sizeY = DeltaY*np.random.normal(0,1) + OffsetY
             elif size_dist == 'uniform':
-                sizeX = DeltaX*np.random.uniform(-1,1)
-                sizeY = DeltaY*np.random.uniform(-1,1)
+                sizeX = DeltaX*np.random.uniform(-1,1) + OffsetX
+                sizeY = DeltaY*np.random.uniform(-1,1) + OffsetY
             elif size_dist == 'uniform2': 
                 #uniform distribution without randomness (to use on 1 variable max)
-                sizeX = DeltaX*(i-nb_part/2)/nb_part*2
-                sizeY = DeltaY*(i-nb_part/2)/nb_part*2
+                sizeX = DeltaX*(i-nb_part/2)/nb_part*2 + OffsetX
+                sizeY = DeltaY*(i-nb_part/2)/nb_part*2 + OffsetY
             else:
                 raise Exception('Distribution chosen for "size_dist" is not valid')
             
@@ -647,7 +657,29 @@ class Beam:
         return np.asarray(my_list) # convert to numpy
         
         
+    def pos_X(self, row_nb=-1, clip_dist=1):
+        """
+    
+        Parameters
+        ----------
+        row_nb : int, optional
+            Row number (in Particle dataframe) at which the property is calculated. The default is -1.
+        clip_dist : float, optional
+            Use  particles within [-clip_dist,clip_dist] only. The default is 1.
+
+        Returns
+        -------
+        mu : float
+            Transverse position X of the beam.
+            
+        """
         
+        values = self.get_beam_param(param='x', row_nb=row_nb)
+        (mu, sigma) = norm.fit(np.clip(values[~np.isnan(values)], -clip_dist, clip_dist))
+        
+        
+        return mu
+    
     def size_X(self, row_nb=-1, clip_dist=1):
         """
     
@@ -670,6 +702,29 @@ class Beam:
         
         
         return sigma
+    
+    
+    def pos_Y(self, row_nb=-1, clip_dist=1):
+        """
+    
+        Parameters
+        ----------
+        row_nb : int, optional
+            Row number (in Particle dataframe) at which the property is calculated. The default is -1.
+        clip_dist : float, optional
+            Use  particles within [-clip_dist,clip_dist] only. The default is 1.
+
+        Returns
+        -------
+        sigma : float
+            Transverse position Y of the beam.
+            
+        """
+        
+        values = self.get_beam_param(param='y', row_nb=row_nb)
+        (mu, sigma) = norm.fit(np.clip(values[~np.isnan(values)], -clip_dist, clip_dist))
+        return mu
+    
     
     def size_Y(self, row_nb=-1, clip_dist=1):
         """
@@ -817,6 +872,28 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                    new_element = Quadrupole(name = name, length = L, B=B, a=a, CCT_angle = CCT_angle, element_rot_rad=element_angle)
                    
                    my_beamline.add_element(new_element)
+                   
+               elif data[0][0:3] == '(SM':
+                   # scanning magnet
+                   
+                   L = float(data[1].replace(";","") )
+                   Bx = float(data[2].replace(";","") )
+                   By = float(data[3].replace(";","") )
+                   apertureX = float(data[4].replace(";","") )
+                   apertureY = float(data[5].replace(";","") )
+                   
+                   # check if there is a name
+                   posL = line.find('/')
+                   posR = line.rfind('/')
+                   
+                   if posL != -1 and posR != -1 :
+                       name = line[posL+1 : posR].strip()
+                   else: name = ""
+                   
+                   new_element = ScanMagnet(name = name, length = L, Bx=Bx, By=By, apertureX=apertureX, apertureY=apertureY)
+                   my_beamline.add_element(new_element)
+                   
+                   line = fp.readline() # skip next drift
                    
                elif data[0][0:5] == '(slit' or data[0][0:6] == '(slitX' or data[0][0:6] == '(slitY':
                    # slit

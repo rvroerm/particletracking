@@ -54,7 +54,7 @@ def BL_plot_for_traces(BL : Beamline, title='Beamline'):
     
     ax_X = fig.add_subplot(2,1,1)
     ax_Y = fig.add_subplot(2,1,2)
-    ylim = 0.15
+    ylim = 0.25
     
     for element in element_list:
         
@@ -89,7 +89,28 @@ def BL_plot_for_traces(BL : Beamline, title='Beamline'):
             ax_Y.add_collection(p)
             ax_Y.text(pos_x, pos_y, element.name, \
                       verticalalignment='center', horizontalalignment='center')
+        
+        
+        elif element.element_type == 'SM' :
+            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZX')
+            p = PatchCollection(patches, color='darkblue', alpha=0.6)
+            ax_X.add_collection(p) 
+            # get coordinates in order to place the label
+            pts_x = list(zip(*patches[0].get_xy()))[0]
+            pts_y = list(zip(*patches[0].get_xy()))[1]
+            pos_x = (max(pts_x)+min(pts_x))/2
+            pos_y = (max(pts_y)+min(pts_y))/2
             
+            ax_X.text(pos_x, pos_y, element.name, rotation = 90,
+                      verticalalignment='center', horizontalalignment='center')
+            
+            [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZY')
+            p = PatchCollection(patches, color='darkblue', alpha=0.6)
+            ax_Y.add_collection(p)
+            ax_Y.text(pos_x, pos_y, element.name, rotation = 90,
+                      verticalalignment='center', horizontalalignment='center')
+        
+        
         elif element.element_type == 'quad' :
             [patches, alpha] = magnet_patches(element, start_point=start_point, orientation='ZX')
             p = PatchCollection(patches, color='red', alpha=0.6)
@@ -285,7 +306,7 @@ def BL_geometry(BL : Beamline, refp=0):
     # resize figure
     fig.set_size_inches(12, 12*(max_y+1.5)/(max_x+1.5))
     
-    print(18*(max_y+1.5)/(max_x+1.5))
+    
     
     return [fig]
 
@@ -430,6 +451,7 @@ def magnet_patches(element: BL_Element, orientation = 'ZX', \
     pt4.reverse() 
     upper_pts = pt1 + pt2
     lower_pts = pt3 + pt4
+    
     
     # create patches for plot
     patches = []

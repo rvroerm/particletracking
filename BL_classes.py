@@ -567,12 +567,29 @@ class Particle:
 
 class Beam:
     
+    
+    
     def __init__(self, nb_part=1000, \
                        refE = 160, DeltaE=0, E_dist='uniform',  \
                        DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
                        OffsetX = 0, OffsetY=0, \
                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform', \
                        particle_type='proton'):
+        """
+        Initializes a beam with a set of nb_part particles
+        
+        The parameters for these particles are set statistically according to the inputs
+        
+        refE = central energy
+        DeltaE = energy span around central energy
+        E_dist = energy distribution with parameters refE, DeltaE. Possible distributions are cst, uniform, uniform2 (=uniform without random), normal
+        DeltaX/DeltaY = spread size in X/Y
+        OffsetX/Y = position offset in X/Y
+        size_dist = position distribution with parameters refE, DeltaE. Possible distributions are cst, uniform, uniform2 (=uniform without random), normal
+        DeltaDivX/Y = spread in divergence in X/Y
+        div_dist = divergence distribution with parameters refE, DeltaE. Possible distributions are cst, uniform, uniform2 (=uniform without random), normal
+        particle_type
+        """
         
         # initialize empty list of particles
         self.particle_list = []
@@ -580,18 +597,18 @@ class Beam:
         for i in range(0,nb_part):
             # initialize particle properties
             if size_dist =='cst':
-                sizeX = DeltaX + OffsetX
-                sizeY = DeltaY + OffsetY
+                posX = DeltaX + OffsetX
+                posY = DeltaY + OffsetY
             elif size_dist == 'normal':
-                sizeX = DeltaX*np.random.normal(0,1) + OffsetX
-                sizeY = DeltaY*np.random.normal(0,1) + OffsetY
+                posX = DeltaX*np.random.normal(0,1) + OffsetX
+                posY = DeltaY*np.random.normal(0,1) + OffsetY
             elif size_dist == 'uniform':
-                sizeX = DeltaX*np.random.uniform(-1,1) + OffsetX
-                sizeY = DeltaY*np.random.uniform(-1,1) + OffsetY
+                posX = DeltaX*np.random.uniform(-1,1) + OffsetX
+                posY = DeltaY*np.random.uniform(-1,1) + OffsetY
             elif size_dist == 'uniform2': 
                 #uniform distribution without randomness (to use on 1 variable max)
-                sizeX = DeltaX*(i-nb_part/2)/nb_part*2 + OffsetX
-                sizeY = DeltaY*(i-nb_part/2)/nb_part*2 + OffsetY
+                posX = DeltaX*(i-nb_part/2)/nb_part*2 + OffsetX
+                posY = DeltaY*(i-nb_part/2)/nb_part*2 + OffsetY
             else:
                 raise Exception('Distribution chosen for "size_dist" is not valid')
             
@@ -626,7 +643,7 @@ class Beam:
                 
             
             # create new particle
-            new_particle = Particle(z=0, x=sizeX , y=sizeY, divX=divX, divY=divY, \
+            new_particle = Particle(z=0, x=posX , y=posY, divX=divX, divY=divY, \
                                     dL=0, p=EtoP(E), refp=EtoP(refE), particle_type=particle_type)
                                                                                                    
         

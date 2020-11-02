@@ -241,7 +241,20 @@ def BL_geometry(BL : Beamline, refp=0):
             ax_X.text(np.average(pts_x) + text_offset[0], np.average(pts_y)+text_offset[1], element.name, 
                       verticalalignment='center', horizontalalignment='center')
             
+        elif element.element_type == 'SM' :
+            # get element patches and represent it on the figure
+            [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation='ZX', straigth_plot = False)
+            p = PatchCollection(patches, color='darkblue', alpha=0.6)
+            ax_X.add_collection(p) 
+            # get coordinates in order to place the label
+            pts_x = list(zip(*patches[0].get_xy()))[0]
+            pts_y = list(zip(*patches[0].get_xy()))[1]
+            text_offset = np.matmul(rot_mat, [0,0.3]) # vertical offset for text, rotated if needed
+            ax_X.text(np.average(pts_x) + text_offset[0], np.average(pts_y)+text_offset[1], element.name, 
+                      verticalalignment='center', horizontalalignment='center', 
+                      rotation = abs(90 + rot_angle*180/3.14)%180) 
             
+        
         elif element.element_type == 'quad' :
             # get element patches and represent it on the figure
             [patches, rot_angle] = magnet_patches(element, start_point=start_point, start_angle=rot_angle, orientation='ZX', straigth_plot = False)
@@ -253,7 +266,8 @@ def BL_geometry(BL : Beamline, refp=0):
             text_offset = np.matmul(rot_mat, [0,0.3]) # vertical offset for text, rotated if needed
             ax_X.text(np.average(pts_x) + text_offset[0], np.average(pts_y)+text_offset[1], element.name, 
                       verticalalignment='center', horizontalalignment='center', 
-                      rotation = 90)
+                      rotation = abs(90 + rot_angle*180/3.14)%180 )
+            
             
         elif element.element_type == 'slit' :
             # get element patches and represent it on the figure
@@ -267,8 +281,9 @@ def BL_geometry(BL : Beamline, refp=0):
             text_offset = np.matmul(rot_mat, [0,0.3]) # vertical offset for text, rotated if needed
             ax_X.text(np.average(pts_x) + text_offset[0], np.average(pts_y)+text_offset[1], element.name, \
                       verticalalignment='center', horizontalalignment='center', 
-                      rotation = 90)
-        
+                      rotation = abs(90 + rot_angle*180/3.14)%180  )
+            
+    
         # update starting point for the next element  
         if element.curvature == 0 :
             start_point = start_point + np.matmul(rot_mat, [element.length , 0])

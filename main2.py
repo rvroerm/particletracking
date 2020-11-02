@@ -26,7 +26,7 @@ my_beamline = create_BL_from_Transport(input_file, CCT_angle = 0)
 
 
 refE = 160
-DeltaE = 5
+DeltaE = 2
 
 # plot beamline
 BL_geometry(my_beamline, refp=EtoP(refE))
@@ -40,9 +40,9 @@ BL_geometry(my_beamline, refp=EtoP(refE))
 # plot beam through BL
 
 
-my_beam = Beam(nb_part=100, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
+my_beam = Beam(nb_part=10, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
                         DeltaX = 10**-5, DeltaY = 10**-5, size_dist='normal', \
-                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='normal', \
+                        DeltaDivX = 0.005, DeltaDivY = 0.005, div_dist='uniform', \
                         OffsetX = 0., OffsetY=0)
 
 
@@ -233,15 +233,15 @@ if variation_study:
     
     elements_to_correct = ["Q4X"]
     #elements_to_correct = ["Q4X","Q5Y"]
-    error_range = [0.5,0.6,0.7,0.8,0.9,1,1.1,1.5,2]
-    error_range = [0.8, 0.9,0.95, 1, 1.05, 1.1, 1.2]
+    error_range = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.5, 2]
+    error_range = [0.8, 0.9, 0.95, 1, 1.05, 1.1, 1.2]
     
     elements_to_tune = ["QN1", "QN3"]
     elements_to_tune = ["Q5Y"]
     
     #tune_range = [0.95, 0.975, 0.99, 1, 1.01, 1.025, 1.05]
     #tune_range = [0.5, 0.75, 0.9, 0.95, 1, 1.05, 1.1, 1.25, 1.5]
-    tune_range = [0.8, 0.9,0.95, 1, 1.05, 1.1, 1.2]
+    tune_range = [0.8, 0.9, 0.95, 1, 1.05, 1.1, 1.2]
     #tune_range = [0.5,0.6,0.7,0.8,0.9,1,1.1,1.5,2]
     
     for element_to_correct in elements_to_correct:

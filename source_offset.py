@@ -50,13 +50,14 @@ z_ISO = my_beamline.BL_df.loc[index,'z [m]']
 max_offset = 0.002
 offset_list = np.arange(-max_offset, max_offset + max_offset/10, max_offset/10)
 
-results_df = pd.DataFrame(columns = ['offset [mm]','BL eff [%]','size X [mm]','size Y [mm]'])
+# initialize dataframe to store the results
+results_df = pd.DataFrame(columns = ['offset [mm]','BL eff [%]','pos X [mm]','pos Y [mm]','size X [mm]','size Y [mm]'])
 
 for offset in offset_list :
 
-    my_beam = Beam(nb_part=1000, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
+    my_beam = Beam(nb_part=100, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
                             DeltaX = 10**-5, DeltaY = 10**-5, size_dist='uniform', \
-                            DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform', \
+                            DeltaDivX = 0.005, DeltaDivY = 0.005, div_dist='uniform', \
                             OffsetX = offset, OffsetY = offset)
     
     
@@ -69,13 +70,18 @@ for offset in offset_list :
     X = my_beam.get_beam_param(param='x', row_nb=p_ISO_index)
     efficiency = len(X[~np.isnan(X)]) / len(X)
     
+    pos_X = my_beam.pos_X(row_nb = p_ISO_index)
+    pos_Y = my_beam.pos_Y(row_nb = p_ISO_index)
+    
     sigma_X = my_beam.size_X(row_nb = p_ISO_index)
     sigma_Y = my_beam.size_Y(row_nb = p_ISO_index)
-  
+    
     #print("offset = %.2f mm : efficiency = %.2f %%, sigmaX= %.2f mm and sigmaY= %.2f mm"%(offset*1000, efficiency*100, sigma_X*1000, sigma_Y*1000))
     
     new_line = pd.DataFrame.from_dict({'offset [mm]' : [offset*1000], 
                                         'BL eff [%]' : [efficiency*100], 
+                                        'pos X [mm]' : [pos_X*1000], 
+                                        'pos Y [mm]': [pos_Y*1000],
                                         'size X [mm]' : [sigma_X*1000], 
                                         'size Y [mm]': [sigma_Y*1000]})
     results_df = results_df.append(new_line, ignore_index=True)

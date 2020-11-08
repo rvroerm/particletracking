@@ -70,7 +70,7 @@ for i in range(0,nb_part):
     B=0.7
     a=0.04
     N_segments = 10
-    [beam[:,:,i],it_z] = quad(L,B,a,beam[:,:,i],it_z,N_segments,refE)
+    [beam[:,:,i],it_z] = quad(L,B,a,beam[:,:,i],it_z,refE,N_segments)
     
     
     L = 0.4
@@ -84,7 +84,7 @@ for i in range(0,nb_part):
     N_segments = 10
     use_sext = True    
     if use_sext :
-        [beam[:,:,i],it_z] = sextupole(L,B,a,alpha,beam[:,:,i],it_z,N_segments,refE)
+        [beam[:,:,i],it_z] = sextupole(L,B,a,alpha,beam[:,:,i],it_z,refE,N_segments)
     else:
         [beam[:,:,i],it_z] = drift(L,beam[:,:,i],refE,it_z,1)
     
@@ -94,7 +94,7 @@ for i in range(0,nb_part):
 #    B = 1
 #    a=0.04
 #    N_segments = 10
-#    [beam[:,:,i],it_z] = quad(L,B,a,beam[:,:,i],it_z,N_segments,refE)
+#    [beam[:,:,i],it_z] = quad(L,B,a,beam[:,:,i],it_z,refE,N_segments)
 #    
     
     L = 0.5

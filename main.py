@@ -40,9 +40,9 @@ BL_geometry(my_beamline, refp=EtoP(refE))
 # plot beam through BL
 
 
-my_beam = Beam(nb_part=10, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
+my_beam = Beam(nb_part=1000, refE = refE, DeltaE=DeltaE, E_dist='uniform2',  \
                         DeltaX = 10**-5, DeltaY = 10**-5, size_dist='normal', \
-                        DeltaDivX = 0.005, DeltaDivY = 0.005, div_dist='uniform', \
+                        DeltaDivX = 0.05, DeltaDivY = 0.05, div_dist='uniform', \
                         OffsetX = 0., OffsetY=0)
 
 

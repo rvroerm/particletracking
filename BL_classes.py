@@ -9,7 +9,7 @@ Created on Mon Jan 13 15:40:04 2020
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat, Highland, rot_mat
+from transfer_functions import PtoGamma, PtoBrho, EtoP, PtoE, drift_matrix, quad_matrix, sec_bend_matrix, pole_face_mat, solenoid_mat, Highland, rot_mat
 from math import sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, pi, atan, asin, acos
 import warnings
 import time
@@ -428,6 +428,23 @@ class Particle:
             
         return
     
+    def particle_through_solenoid(self, element: Solenoid):
+        N_segments = element.N_segments
+        
+        B = element.Bfield
+        L = element.length/N_segments
+        a = element.apertureX
+        
+        solen_mat = solenoid_mat(L, B, a,beam,it_z,refE, N_segments=N_segments)
+        
+        for i in np.arange(0, N_segments):
+            # calculate new particle properties 
+            self.it = self.it + 1
+            self.X[self.it, :] = np.matmul(solenoid_mat, self.X[self.it - 1, :])
+            self.z[self.it] = self.z[self.it-1] + L
+            
+            self.kill_lost_particle(element)
+    
     def kill_lost_particle(self, element: BL_Element):
         if element.aperture_type == "rectangular":
             if abs(self.get_x(self.it)) > element.apertureX or abs(self.get_y(self.it)) > element.apertureY :
@@ -775,7 +792,12 @@ class Beam:
 
 def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, apertureX=0):
     """
-    opens a transport file and creates the corresponding Beamline object
+    opens a Transport input file and creates the corresponding Beamline object
+    
+    Optional parameters:
+        scaling ratio: multiplies all magnetic fields
+        CCT_angle: considers a CCT magnet with a wire inclination equal to the angle
+        aperture_X: can define the vertical aperture of the dipoles as an input
     """
     
     # default settings
@@ -889,13 +911,38 @@ def create_BL_from_Transport(transport_file, scaling_ratio = 1, CCT_angle=0, ape
                    new_element = Quadrupole(name = name, length = L, B=B, a=a, CCT_angle = CCT_angle, element_rot_rad=element_angle)
                    
                    my_beamline.add_element(new_element)
+               
+                
+               elif data[0][0:3] == "19.":
+                   # solenoid
+                   L = float(data[1].replace(";","") )
+                   B = float(data[2].replace(";","") ) * scaling_ratio
                    
+                   if apertureX!=0: #value was given in input
+                       a = apertureX 
+                   elif vertical_aperture != 0:
+                       a = vertical_aperture
+                   else:
+                       a = apertureY
+                   
+                   # check if there is a name
+                   posL = line.find('/')
+                   posR = line.rfind('/')
+                   
+                   if posL != -1 and posR != -1 :
+                       name = line[posL+1 : posR].strip()
+                   else: name = ""
+                   
+                   new_element = Solenoid(name = name, length = L, B=B, a=a)
+                   my_beamline.add_element(new_element)
+                   
+                
                elif data[0][0:3] == '(SM':
                    # scanning magnet
                    
                    L = float(data[1].replace(";","") )
-                   Bx = float(data[2].replace(";","") )
-                   By = float(data[3].replace(";","") )
+                   Bx = float(data[2].replace(";","") ) * scaling_ratio
+                   By = float(data[3].replace(";","") ) * scaling_ratio
                    apertureX = float(data[4].replace(";","") )
                    apertureY = float(data[5].replace(";","") )
                    

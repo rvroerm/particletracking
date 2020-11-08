@@ -371,71 +371,6 @@ def RF_cavity_old(delta_E,freq,phi,beam,refE,it_z):
 
 
 
-def quad(L,B,a,beam,it_z,refE,N_segments = 10,kill_lost_particles=True,rest_mass=938, \
-          paraxial_correction = False, dpz_tolerance=10**-6):
-    """
-    L =length, B=field, a=aperture
-    kill_lost_particles=True will kill particles outside the good field region
-    paraxial_correction = True will scale the fields according to take into account the fact that pz != p
-    the relative tolerace is dpz_tolerance
-    """
-    
-    L_segment = L/N_segments
-    ref_p = EtoP(refE)
-    p = ref_p + beam[it_z,6]*ref_p
-    
-    
-    for i in range(0,N_segments):
-        
-        if np.isnan(beam[it_z,1]) or (kill_lost_particles and (sqrt(beam[it_z,1]**2 + beam[it_z,3]**2) >= a)):
-            # lost particle
-            it_z = it_z + 1
-            beam[it_z,0] = beam[it_z-1,0] + L_segment
-            beam[it_z,1:7] = np.nan            
-        else:
-            if paraxial_correction :
-                corr_fact = sqrt(beam[it_z,2]**2+beam[it_z,4]**2+1)
-                B_corrected = B / corr_fact
-            else:
-                corr_fact = 1
-                B_corrected = B
-            
-            quad_mat = quad_matrix(L_segment,B_corrected,a,p,rest_mass)
-            
-            new_beam = np.matmul(quad_mat,np.transpose(beam[it_z,1:7]))
-            
-            
-            
-            if abs(sqrt(new_beam[1]**2+new_beam[3]**2+1) - corr_fact) > dpz_tolerance and paraxial_correction :
-                # need more intermediate points
-                
-                intermediate_segments = int(abs(sqrt(new_beam[1]**2+new_beam[3]**2+1) - corr_fact) / dpz_tolerance ) + 1
-                
-                
-                new_beam = beam[it_z,1:7]
-                for j in range(0,intermediate_segments):
-                    corr_fact = sqrt(new_beam[1]**2+new_beam[3]**2+1)
-                    B_corrected = B / corr_fact
-                    quad_mat = quad_matrix(L_segment/intermediate_segments,B_corrected,a,p,rest_mass)
-                    
-                    new_beam = np.matmul(quad_mat,np.transpose(new_beam))
-                
-                it_z = it_z + 1
-                beam[it_z,0] = beam[it_z-1,0] + L_segment
-                beam[it_z,1:7] = new_beam
-            else:
-                it_z = it_z + 1
-                beam[it_z,0] = beam[it_z-1,0] + L_segment
-                beam[it_z,1:7] = np.matmul(quad_mat,np.transpose(beam[it_z-1,1:7]))
-                
-                L_eff = abs(L_segment/cos(sqrt(beam[it_z,2]**2+beam[it_z,4]**2))) # effective length travelled by particle (neglect change in direction)
-                beam[it_z,5] = (L_segment - L_eff) + beam[it_z,5] #higher order correction related to beam angle
-
-            
-    
-    p = ref_p + beam[it_z,6]*ref_p
-    
-    return [beam, it_z]
     
 def quad_matrix(L,B,a,p,rest_mass=938):
     """
@@ -602,112 +537,6 @@ def sec_bend_matrix(L,B,n,p,rest_mass=938):
 
 
 
-
-def sec_bend(L,B,n,gap,beam,refE,it_z,N_segments = 10,kill_lost_particles=True,rest_mass=938,gap_X=1, \
-          paraxial_correction = False, dpz_tolerance=10**-6):
-    """
-    L =length, B=field, a=aperture
-    kill_lost_particles=True will kill particles outside the good field region
-    paraxial_correction = True will scale the fields according to take into account the fact that pz != p
-    the relative tolerace is dpz_tolerance
-    """
-    
-    L_segment = L/N_segments
-    ref_p = EtoP(refE)
-    p = ref_p + beam[it_z,6]*ref_p
-    
-    
-    for i in range(0,N_segments):
-        
-        if np.isnan(beam[it_z,1]) or (kill_lost_particles and (abs(beam[it_z,1]) >= gap_X or abs(beam[it_z,3]) >= gap)):
-            # lost particle
-            it_z = it_z + 1
-            beam[it_z,0] = beam[it_z-1,0] + L_segment
-            beam[it_z,1:7] = np.nan            
-        else:
-            if paraxial_correction :
-                corr_fact = sqrt(beam[it_z,2]**2+beam[it_z,4]**2+1)
-                B_corrected = B / corr_fact
-            else:
-                corr_fact = 1
-                B_corrected = B
-            
-            bend_mat = sec_bend_matrix(L_segment,B_corrected,n,p,rest_mass)
-            
-            new_beam = np.matmul(bend_mat,np.transpose(beam[it_z,1:7]))
-            
-            
-            
-            if abs(sqrt(new_beam[1]**2+new_beam[3]**2+1) - corr_fact) > dpz_tolerance and paraxial_correction :
-                # need more intermediate points
-                
-                intermediate_segments = int(abs(sqrt(new_beam[1]**2+new_beam[3]**2+1) - corr_fact) / dpz_tolerance ) + 1
-                
-                new_beam = beam[it_z,1:7]
-                for j in range(0,intermediate_segments):
-                    corr_fact = sqrt(new_beam[1]**2+new_beam[3]**2+1)
-                    B_corrected = B / corr_fact
-                    
-                    bend_mat = sec_bend_matrix(L_segment/intermediate_segments,B_corrected,n,p,rest_mass)
-                    
-                    new_beam = np.matmul(bend_mat,np.transpose(new_beam))
-                
-                it_z = it_z + 1
-                beam[it_z,0] = beam[it_z-1,0] + L_segment
-                beam[it_z,1:7] = new_beam
-            else:
-                it_z = it_z + 1
-                beam[it_z,0] = beam[it_z-1,0] + L_segment
-                beam[it_z,1:7] = np.matmul(bend_mat,np.transpose(beam[it_z-1,1:7]))  # already calculated in new_beam above?
-                
-            
-    
-    return [beam, it_z]
-
-
-def pole_face(angle,B,gap,k1,k2,beam,refE,it_z,paraxial_correction = False):
-    """
-    k1 and k2 related to frindge field properties; default k1=0.5, k2=0
-    see SLAC transport manual
-    """
-    
-    ref_p = EtoP(refE)
-    p = ref_p + beam[it_z,6]*ref_p
-    Brho  = PtoBrho(p)
-    
-    if paraxial_correction :
-        corr_fact = sqrt(beam[it_z,2]**2+beam[it_z,4]**2+1)
-        B_corrected = B / corr_fact
-    else:
-        B_corrected = B
-    
-    
-    radius = Brho/B_corrected
-    
-    beta = math.radians(angle)
-    
-    
-    psi = k1*(gap/radius)*((1+sin(beta)**2)/cos(beta))*(1-k1*k2*gap/radius*tan(beta))    
-    
-    
-    pole_mat = np.array([[1,0,0,0,0,0],
-                    [tan(beta)/radius,1,0,0,0,0],
-                    [0,0,1,0,0,0],
-                    [0,0,-tan(beta-psi)/radius,1,0,0],
-                    [0,0,0,0,1,0],
-                    [0,0,0,0,0,1]])
-    
-    
-    it_z = it_z + 1
-    beam[it_z,0] = beam[it_z-1,0]
-    beam[it_z,1:7] = np.matmul(pole_mat,np.transpose(beam[it_z-1,1:7]))
-    
-    
-    
-    
-    return [beam, it_z]
-
-
 def pole_face_mat(angle,B,gap,p,k1=0.5,k2=0,paraxial_correction = False):
     """
     k1 and k2 related to frindge field properties; default k1=0.5, k2=0
@@ -736,56 +565,15 @@ def pole_face_mat(angle,B,gap,p,k1=0.5,k2=0,paraxial_correction = False):
     
     return pole_mat
 
-def bending(L,B,n,pole_in,pole_out,gap,k1,k2,beam,refE,it_z,N_segments = 10,kill_lost_particles=True,gap_X=1,paraxial_correction = False, dpz_tolerance=10**-6):
+
+
+def solenoid_mat(L, B, a, p, refE, N_segments=20):
     """
-    kill_lost_particles will kill particles that are beyond the gap opening in Y
-    horizontal gap is used to kill particles that are too far; default = 1 m
-    paraxial_correction = True will scale the fields according to take into account the fact that pz != p
-    the relative tolerace is dpz_tolerance
+    Transfer function for a solenoid
     """
     
-    [beam, it_z] = pole_face(pole_in,B,gap,k1,k2,beam,refE,it_z,paraxial_correction = paraxial_correction)
-    
-    #[beam, it_z] = sec_bend(L,B,n,gap,beam,refE,it_z,N_segments,kill_lost_particles,gap_X)
-    
-    [beam, it_z] = sec_bend(L,B,n,gap,beam,refE,it_z,N_segments = N_segments,kill_lost_particles=kill_lost_particles,gap_X=gap_X, \
-          paraxial_correction = paraxial_correction, dpz_tolerance=dpz_tolerance)
-    
-    [beam, it_z]= pole_face(pole_out,B,gap,k1,k2,beam,refE,it_z,paraxial_correction = paraxial_correction)
-
-    return [beam, it_z]
-
-
-
-
-
-def solenoid(L,B,a,beam,it_z,refE,N_segments=20):
-    
-    
-    ref_p = EtoP(refE)
-    p = ref_p + beam[it_z,6]*ref_p
-    gamma = PtoGamma(p,938)
-    #speed = PtoV(p,938)
-    
-    
-    
-    
-    E = PtoE(p)
-    Brho  = 1/300*sqrt(E**2+2*938*E)
-    
+    Brho  = PtoBrho(p)
     K = 1/2 * B/Brho
-    L_segment = L/N_segments
-    
-    
-#    if Brho/B < L*10 :
-#        # need more segments
-#        N_segments = int(L/(Brho/B))*10
-#        L_segment = L/N_segments
-#    else:
-#        N_segments = 1
-#        L_segment = L
-    
-
     
     entrance_mat = np.array([[1,0,0,0,0,0],
                     [0,1,K,0,0,0],
@@ -802,34 +590,20 @@ def solenoid(L,B,a,beam,it_z,refE,N_segments=20):
                     [0,0,0,0,1,0],
                     [0,0,0,0,0,1]])
     
-    C = cos(K*L_segment)
-    S = sin(K*L_segment)
+    C = cos(K*L)
+    S = sin(K*L)
     
     segment_mat = np.array([[1,S*C/K,0,S*S/K,0,0],
                     [0,2*C*C-1,0,2*S*C,0,0],
                     [0,-S*S/K,1,S*C/K,0,0],
                     [0,-2*S*C,0,2*C*C-1,0,0],
-                    [0,0,0,0,1,L_segment/gamma**2],
+                    [0,0,0,0,1,L/gamma**2],
                     [0,0,0,0,0,1]])
     
-    it_z = it_z + 1
-    beam[it_z,0] = beam[it_z-1,0]
-    beam[it_z,1:7] = np.matmul(entrance_mat,np.transpose(beam[it_z-1,1:7]))
-    
-    for i in range(0,N_segments):
-        it_z = it_z + 1
-        beam[it_z,0] = beam[it_z-1,0] + L_segment
-        beam[it_z,1:7] = np.matmul(segment_mat,np.transpose(beam[it_z-1,1:7]))
-        L_eff = abs(L_segment/cos(sqrt(beam[it_z,2]**2+beam[it_z,4]**2))) # effective length travelled by particle (negliect change in direction)
-        beam[it_z,5] = (L_segment - L_eff) + beam[it_z,5] #higher order correction related to beam angle
-    
-    it_z = it_z + 1
-    beam[it_z,0] = beam[it_z-1,0]
-    beam[it_z,1:7] = np.matmul(exit_mat,np.transpose(beam[it_z-1,1:7]))
-        
+    solenoid_mat = exit_mat @ segment_mat @ entrance_mat
     
     
-    return [beam, it_z]
+    return solenoid_mat
 
 
     
